@@ -50,7 +50,9 @@ export function createEndScreen(root, { onRestart, onMenu }) {
     msg.textContent = 'Guardando…';
     try {
       const saved = await submitScore(track.collection, name, time);
-      msg.textContent = '¡Tiempo guardado!';
+      msg.textContent = saved.improved
+        ? '¡Tiempo guardado!'
+        : `Tu mejor tiempo (${formatFinal(saved.best)}) sigue en el ranking`;
       form.hidden = true;
       await renderRanking(list, track.collection, saved.name);
     } catch (err) {

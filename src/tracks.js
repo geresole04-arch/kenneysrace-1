@@ -3,6 +3,7 @@
 
 const FOREST_SCALE = 0.8;
 const VOLCANO_SCALE = 0.82;
+const SKY_SCALE = 0.85;
 
 export const TRACKS = [
   {
@@ -25,6 +26,18 @@ export const TRACKS = [
     collection: 'scores', // Firestore collection for this track's ranking
   },
   {
+    id: 'cielo',
+    name: 'Cielo',
+    subtitle: 'Media',
+    theme: 'sky',
+    // Flowing curves high above the clouds, under rainbows
+    corners: SKY_CORNERS().map(([x, z]) => [x * SKY_SCALE, z * SKY_SCALE]),
+    radius: [11, 10, 9, 10, 10, 11, 10, 9, 10, 10],
+    roadHalfWidth: 5.8,
+    finish: [22, 0],
+    collection: 'scores_cielo',
+  },
+  {
     id: 'volcan',
     name: 'Volcán',
     subtitle: 'Difícil',
@@ -37,6 +50,21 @@ export const TRACKS = [
     collection: 'scores_volcan',
   },
 ];
+
+function SKY_CORNERS() {
+  return [
+    [0, 0],
+    [62, 0],
+    [84, 32],
+    [52, 52],
+    [88, 78],
+    [62, 108],
+    [8, 108],
+    [-16, 72],
+    [16, 46],
+    [-22, 22],
+  ];
+}
 
 function VOLCANO_CORNERS() {
   return [

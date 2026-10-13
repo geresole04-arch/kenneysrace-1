@@ -1,6 +1,7 @@
 // Scenery per theme.
 // - forest: Kenney stands, tents, lights and flags + large low-poly pines.
 // - volcano: background volcanoes, glowing lava pools and basalt rocks.
+// - sky: a sea of clouds, rainbows (one as a gate over the track) and balloons.
 // Both get the Kenney red/white start arch over the finish line.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -26,6 +27,15 @@ const VOLCANO = {
   mountain: 0x3a2b27,
 };
 
+const SKY = {
+  cloudCount: 150,
+  cloudSize: [4, 12],
+  cloud: 0xffffff,
+  cloudShade: 0xe6f2ff,
+  rainbow: [0xff4d4d, 0xff9a3c, 0xffe14d, 0x5fd66b, 0x4db8ff, 0x5a6cff, 0xa65cff],
+  balloons: [0xff6b9a, 0xffc94d, 0x6be0a0, 0x7ab8ff, 0xc08cff],
+};
+
 const modelCache = new Map();
 
 export async function loadDecoration(group, track, theme) {
@@ -43,6 +53,7 @@ export async function loadDecoration(group, track, theme) {
 
   addArch(group, track, models.overheadRoundColored);
   if (theme === 'volcano') decorateVolcano(group, track, place, occupied);
+  else if (theme === 'sky') decorateSky(group, track, place, occupied);
   else decorateForest(group, track, place, occupied);
 }
 
@@ -176,6 +187,97 @@ function blob(x, y, z, radius, mat, rand) {
   m.position.set(x, y, z);
   m.receiveShadow = !mat.isMeshBasicMaterial;
   return m;
+}
+
+// ---------- Sky ----------
+
+function decorateSky(group, track, place, occupied) {
+  const { x: fx, z: fz, nz } = track.finish;
+  const bo = track.barrierOffset;
+  const far = nz > 0 ? -1 : 1; // far side of the start straight
+  for (const dx of [-8, -13]) place('flagCheckers', fx + dx, fz + far * (bo + 2), 0, 5, 2);
+
+  const b = bounds(track);
+  const cx = (b.minX + b.maxX) / 2;
+
+  // Rainbow gate over the road, on a stretch that runs up/down the screen so the
+  // camera sees its colours face-on (closest such point to half a lap)
+  const half = track.finish.s + track.length * 0.5;
+  const lapDist = (p) => Math.abs(((p.s - half + track.length * 1.5) % track.length) - track.length / 2);
+  const gate = track.centerline
+    .filter((p) => Math.abs(p.tz) > 0.97)
+    .reduce((best, p) => (!best || lapDist(p) < lapDist(best) ? p : best), null) ?? track.at(half);
+  addRainbow(group, gate.x, gate.z, Math.atan2(-gate.nz, gate.nx), bo + 2.5, 0.55);
+  addRainbow(group, cx - 10, b.minZ - 70, 0, 55, 2.6);
+  addRainbow(group, b.maxX + 55, b.minZ + 20, Math.PI / 2.6, 34, 1.8);
+
+  // Hot-air balloons floating around
+  const balloons = scatter(track, occupied, { seed: 3, count: 7, margin: 40, size: (r) => 4 + r() * 2.5, radius: (s) => s });
+  balloons.forEach((p, i) => addBalloon(group, p.x, 14 + (i % 3) * 7, p.z, p.size, SKY.balloons[i % SKY.balloons.length]));
+
+  // Sea of clouds: clusters of flat-shaded puffs
+  const clouds = scatter(track, occupied, {
+    seed: 17,
+    count: SKY.cloudCount,
+    size: (r) => SKY.cloudSize[0] + r() * (SKY.cloudSize[1] - SKY.cloudSize[0]),
+    radius: (s) => s * 0.9,
+  });
+  const puff = new THREE.IcosahedronGeometry(0.5, 1);
+  const rand = mulberry32(23);
+  const lit = [];
+  const shade = [];
+  for (const c of clouds) {
+    const n = 3 + Math.floor(rand() * 3);
+    for (let k = 0; k < n; k++) {
+      const a = rand() * Math.PI * 2;
+      const d = c.size * 0.35 * rand();
+      const s = c.size * (0.55 + rand() * 0.45);
+      const m = compose(c.x + Math.cos(a) * d, s * 0.2, c.z + Math.sin(a) * d, rand() * 6, s, s * 0.6, s);
+      (k === 0 ? shade : lit).push(m);
+    }
+  }
+  const flatMat = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
+  group.add(instanced(puff, flatMat(SKY.cloud), lit));
+  group.add(instanced(puff, flatMat(SKY.cloudShade), shade));
+}
+
+// Upright half-torus bands, red outside to violet inside.
+function addRainbow(group, x, z, rotY, radius, band) {
+  const bow = new THREE.Group();
+  SKY.rainbow.forEach((color, i) => {
+    const r = radius - i * band * 1.9;
+    const torus = new THREE.Mesh(
+      new THREE.TorusGeometry(r, band, 6, 40, Math.PI),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    bow.add(torus);
+  });
+  bow.rotation.y = rotY;
+  bow.position.set(x, 0, z);
+  group.add(bow);
+}
+
+function addBalloon(group, x, y, z, size, color) {
+  const balloon = new THREE.Group();
+  const envelope = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 10, 8),
+    new THREE.MeshLambertMaterial({ color, flatShading: true }),
+  );
+  envelope.scale.y = 1.15;
+  const stripe = new THREE.Mesh(
+    new THREE.SphereGeometry(size * 1.01, 10, 2, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.16),
+    new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
+  );
+  stripe.scale.y = 1.15;
+  const basket = new THREE.Mesh(
+    new THREE.BoxGeometry(size * 0.45, size * 0.35, size * 0.45),
+    new THREE.MeshLambertMaterial({ color: 0x9a6a3a, flatShading: true }),
+  );
+  basket.position.y = -size * 1.65;
+  balloon.add(envelope, stripe, basket);
+  balloon.position.set(x, y, z);
+  balloon.traverse((o) => o.isMesh && (o.castShadow = true));
+  group.add(balloon);
 }
 
 // ---------- Shared helpers ----------
