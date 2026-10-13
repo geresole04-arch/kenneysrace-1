@@ -7,7 +7,9 @@ export function createInput(target) {
   const keys = { left: false, right: false };
   const pointers = new Map(); // pointerId -> -1 | 1
 
+  const typing = (e) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
   addEventListener('keydown', (e) => {
+    if (typing(e)) return;
     if (LEFT_KEYS.has(e.code)) keys.left = true;
     else if (RIGHT_KEYS.has(e.code)) keys.right = true;
     else return;
@@ -38,6 +40,10 @@ export function createInput(target) {
   target.addEventListener('contextmenu', (e) => e.preventDefault());
 
   return {
+    reset() {
+      keys.left = keys.right = false;
+      pointers.clear();
+    },
     steer() {
       let s = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
       for (const v of pointers.values()) s += v;

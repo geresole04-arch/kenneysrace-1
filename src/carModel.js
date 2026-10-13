@@ -1,5 +1,5 @@
 // Low-poly compact SUV in the style of a VW T-Cross, Makena turquoise.
-// Real-world proportions (4.1 x 1.78 x 1.58 m, wheelbase 2.56 m).
+// Real length/width (4.1 x 1.78 m, wheelbase 2.56 m), body stretched to ~2 m tall.
 // Faces +X, origin at ground level, centred between the axles.
 import * as THREE from 'three';
 
@@ -12,7 +12,8 @@ const RIM = 0xb9bec6;
 
 const WIDTH = 1.78;
 const WHEELBASE = 2.56;
-const WHEEL_R = 0.36;
+const WHEEL_R = 0.42;
+const BODY_HEIGHT_SCALE = 1.25; // taller than life so it looks like an SUV from above
 const TRACK_W = 1.52; // wheel centre to wheel centre (across)
 const FRONT_X = 2.08;
 const REAR_X = -2.03;
@@ -26,6 +27,12 @@ export function createCarModel() {
   const head = new THREE.MeshBasicMaterial({ color: 0xf4f7ff });
   const tail = new THREE.MeshBasicMaterial({ color: 0xd3202c });
 
+  // Body parts are modelled at real height and stretched up as a group, so the
+  // SUV reads tall from the high game camera. Wheels stay round (added to car).
+  const body = new THREE.Group();
+  body.scale.y = BODY_HEIGHT_SCALE;
+  car.add(body);
+
   // --- Lower body: side profile up to the belt line, rounded with a bevel
   const lower = new THREE.Shape();
   lower.moveTo(REAR_X + 0.1, 0.3);
@@ -38,7 +45,7 @@ export function createCarModel() {
   lower.lineTo(REAR_X + 0.04, 1.06);
   lower.lineTo(REAR_X, 0.62);                                  // tailgate lower part
   lower.quadraticCurveTo(REAR_X + 0.02, 0.32, REAR_X + 0.1, 0.3);
-  car.add(extrude(lower, WIDTH - 0.12, paint, 0.06));
+  body.add(extrude(lower, WIDTH - 0.12, paint, 0.06));
 
   // --- Greenhouse (glass), narrower than the body (tumblehome)
   const cabinW = WIDTH - 0.3;
@@ -49,7 +56,7 @@ export function createCarModel() {
   green.lineTo(-1.92, 1.42);        // rear spoiler area
   green.lineTo(-1.98, 1.06);        // rear glass
   green.closePath();
-  car.add(extrude(green, cabinW, glass, 0.03));
+  body.add(extrude(green, cabinW, glass, 0.03));
 
   // Roof panel + rear spoiler (paint), sitting on top of the glass
   const roof = new THREE.Shape();
@@ -59,63 +66,63 @@ export function createCarModel() {
   roof.lineTo(-1.45, 1.62);
   roof.lineTo(0.12, 1.58);
   roof.closePath();
-  car.add(extrude(roof, cabinW - 0.04, paint, 0.04));
+  body.add(extrude(roof, cabinW - 0.04, paint, 0.04));
 
   // Pillars on both sides so the side windows read as windows
   for (const s of [-1, 1]) {
     const z = s * (cabinW / 2 + 0.035);
-    pillar(car, paint, [0.95, 1.06], [0.18, 1.52], z, 0.09);   // A
-    pillar(car, paint, [-0.38, 1.08], [-0.38, 1.54], z, 0.12); // B
-    pillar(car, paint, [-1.55, 1.08], [-1.72, 1.52], z, 0.26);   // C (thick)
+    pillar(body, paint, [0.95, 1.06], [0.18, 1.52], z, 0.09);   // A
+    pillar(body, paint, [-0.38, 1.08], [-0.38, 1.54], z, 0.12); // B
+    pillar(body, paint, [-1.55, 1.08], [-1.72, 1.52], z, 0.26);   // C (thick)
     // Roof rail
     const rail = box(1.85, 0.06, 0.06, plastic);
     rail.position.set(-0.75, 1.66, s * (cabinW / 2 - 0.12));
-    car.add(rail);
+    body.add(rail);
     // Mirror
     const mirror = box(0.2, 0.14, 0.2, paint);
     mirror.position.set(0.8, 1.13, s * (WIDTH / 2 + 0.06));
-    car.add(mirror);
+    body.add(mirror);
     // Door handle hint / side crease (chrome)
     const crease = box(3.0, 0.025, 0.02, chrome);
     crease.position.set(-0.3, 1.05, s * (WIDTH / 2 + 0.005));
-    car.add(crease);
+    body.add(crease);
     // Side skirt cladding
-    const skirt = box(WHEELBASE - 2 * WHEEL_R - 0.25, 0.16, 0.05, plastic);
+    const skirt = box(WHEELBASE - 2 * WHEEL_R - 0.35, 0.16, 0.05, plastic);
     skirt.position.set(0, 0.38, s * (WIDTH / 2 - 0.01));
-    car.add(skirt);
+    body.add(skirt);
   }
 
   // --- Front: black grille band, chrome strip, headlights, lower intake
   const grille = box(0.06, 0.18, WIDTH - 0.36, plastic);
   grille.position.set(FRONT_X + 0.05, 0.8, 0);
-  car.add(grille);
+  body.add(grille);
   const strip = box(0.07, 0.03, WIDTH - 0.3, chrome);
   strip.position.set(FRONT_X + 0.07, 0.86, 0);
-  car.add(strip);
+  body.add(strip);
   for (const s of [-1, 1]) {
     const light = box(0.08, 0.11, 0.4, head);
     light.position.set(FRONT_X + 0.06, 0.84, s * 0.64);
-    car.add(light);
+    body.add(light);
   }
   const intake = box(0.08, 0.16, WIDTH - 0.6, plastic);
   intake.position.set(FRONT_X + 0.06, 0.47, 0);
-  car.add(intake);
+  body.add(intake);
 
   // --- Rear: full-width light bar, tailgate glass, black bumper
   const bar = box(0.06, 0.07, WIDTH - 0.22, tail);
   bar.position.set(REAR_X - 0.08, 0.95, 0);
-  car.add(bar);
+  body.add(bar);
   for (const s of [-1, 1]) {
     const lamp = box(0.07, 0.16, 0.3, tail);
     lamp.position.set(REAR_X - 0.08, 0.98, s * 0.7);
-    car.add(lamp);
+    body.add(lamp);
   }
   const rearBumper = box(0.1, 0.22, WIDTH - 0.1, plastic);
   rearBumper.position.set(REAR_X - 0.04, 0.42, 0);
-  car.add(rearBumper);
+  body.add(rearBumper);
   const frontBumper = box(0.12, 0.12, WIDTH - 0.1, plastic);
   frontBumper.position.set(FRONT_X + 0.02, 0.33, 0);
-  car.add(frontBumper);
+  body.add(frontBumper);
 
   // --- Wheels + black wheel arches
   const tyreGeo = new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.24, 16);
@@ -161,7 +168,7 @@ export function createCarModel() {
 
 // Half ring that frames the wheel opening.
 function archGeometry() {
-  const outer = WHEEL_R + 0.12;
+  const outer = WHEEL_R + 0.13;
   const inner = WHEEL_R + 0.03;
   const s = new THREE.Shape();
   s.absarc(0, 0, outer, 0, Math.PI, false);
