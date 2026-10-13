@@ -8,9 +8,11 @@ import { createCamera } from './camera.js';
 import { createInput } from './input.js';
 import { createRace, startRace, updateRace } from './race.js';
 import { createHud } from './hud.js';
+import { createEndScreen } from './endScreen.js';
 
 const PHYSICS_STEP = 1 / 120;
 const MAX_FRAME_DT = 1 / 30;
+const END_SCREEN_DELAY = 1.2; // seconds after the finish before the panel shows
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -44,6 +46,19 @@ scene.add(carModel);
 
 const cam = createCamera();
 const input = createInput(canvas);
+const endScreen = createEndScreen(document.getElementById('end'), { onRestart: restart });
+let finishedFor = 0;
+let endShown = false;
+
+function restart() {
+  Object.assign(car, createCar(START));
+  Object.assign(race, createRace(car));
+  startRace(race);
+  input.reset();
+  cam.snap();
+  finishedFor = 0;
+  endShown = false;
+}
 
 function resize() {
   const w = innerWidth;
@@ -70,6 +85,14 @@ function frame(now) {
     acc -= PHYSICS_STEP;
   }
   hud.update(race);
+
+  if (race.state === 'finished' && !endShown) {
+    finishedFor += dt;
+    if (finishedFor >= END_SCREEN_DELAY) {
+      endShown = true;
+      endScreen.show(race.time);
+    }
+  }
 
   // Sync visuals
   carModel.position.set(car.x, 0, car.z);

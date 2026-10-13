@@ -25,8 +25,9 @@ function formatTime(t) {
 }
 
 // Final time keeps hundredths so close runs can be compared.
-function formatFinal(t) {
-  return `${formatTime(t)}.${pad(Math.floor((t % 1) * 100))}`;
+export function formatFinal(t) {
+  const cs = Math.round(t * 100); // integer hundredths avoid float rounding (19.53 -> "52")
+  return `${formatTime(Math.floor(cs / 100))}.${pad(cs % 100)}`;
 }
 
 function pad(n) {

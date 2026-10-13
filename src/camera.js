@@ -34,5 +34,8 @@ export function createCamera() {
       camera.lookAt(focus);
     },
     focus,
+    snap() {
+      first = true;
+    },
   };
 }
