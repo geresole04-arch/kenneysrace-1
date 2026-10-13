@@ -1,11 +1,13 @@
 // Ranking storage: Firestore REST API when configured, localStorage otherwise.
-// Collection "scores": { name: string (1-15 chars), time: number (s), createdAt: timestamp }
+// One collection per track (track.collection, e.g. "scores", "scores_volcan"):
+// { name: string (1-15 chars), time: number (s), createdAt: timestamp }
 import { FIREBASE } from './config.js';
 
 export const NAME_MAX = 15;
 export const RANKING_SIZE = 10;
 const FETCH_LIMIT = 60;       // fetched to keep only each name's best time
-const LOCAL_KEY = 'kenneysrace.ranking';
+const LOCAL_PREFIX = 'kenneysrace.ranking.';
+const BEST_PREFIX = 'kenneysrace.best.';
 const NAME_KEY = 'kenneysrace.name';
 
 export const isOnline = Boolean(FIREBASE.projectId && FIREBASE.apiKey);
@@ -21,17 +23,17 @@ export function roundTime(t) {
   return Math.round(t * 100) / 100;
 }
 
-export async function submitScore(name, time) {
+export async function submitScore(collection, name, time) {
   const entry = { name: cleanName(name), time: roundTime(time) };
   if (!entry.name) throw new Error('empty name');
   saveName(entry.name);
   if (!isOnline) {
-    const all = readLocal();
+    const all = readLocal(collection);
     all.push(entry);
-    writeLocal(all);
+    writeLocal(collection, all);
     return entry;
   }
-  const res = await fetch(`${BASE}/scores?key=${FIREBASE.apiKey}`, {
+  const res = await fetch(`${BASE}/${collection}?key=${FIREBASE.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -47,17 +49,17 @@ export async function submitScore(name, time) {
 }
 
 // Best time per name, fastest first.
-export async function fetchRanking() {
+export async function fetchRanking(collection) {
   let entries;
   if (!isOnline) {
-    entries = readLocal();
+    entries = readLocal(collection);
   } else {
     const res = await fetch(`${BASE}:runQuery?key=${FIREBASE.apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         structuredQuery: {
-          from: [{ collectionId: 'scores' }],
+          from: [{ collectionId: collection }],
           orderBy: [{ field: { fieldPath: 'time' }, direction: 'ASCENDING' }],
           limit: FETCH_LIMIT,
         },
@@ -83,6 +85,28 @@ export function loadName() {
   }
 }
 
+// Personal best per track on this device (shown in the menu).
+export function loadBest(trackId) {
+  try {
+    const v = Number(localStorage.getItem(BEST_PREFIX + trackId));
+    return v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns true when `time` is a new personal best.
+export function saveBest(trackId, time) {
+  const best = loadBest(trackId);
+  if (best !== null && best <= time) return false;
+  try {
+    localStorage.setItem(BEST_PREFIX + trackId, String(roundTime(time)));
+  } catch {
+    /* storage unavailable */
+  }
+  return true;
+}
+
 function saveName(name) {
   try {
     localStorage.setItem(NAME_KEY, name);
@@ -100,18 +124,18 @@ function bestPerName(entries) {
   return [...best.values()].sort((a, b) => a.time - b.time);
 }
 
-function readLocal() {
+function readLocal(collection) {
   try {
-    const v = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '[]');
+    const v = JSON.parse(localStorage.getItem(LOCAL_PREFIX + collection) ?? '[]');
     return Array.isArray(v) ? v : [];
   } catch {
     return [];
   }
 }
 
-function writeLocal(entries) {
+function writeLocal(collection, entries) {
   try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(bestPerName(entries).slice(0, 50)));
+    localStorage.setItem(LOCAL_PREFIX + collection, JSON.stringify(bestPerName(entries).slice(0, 50)));
   } catch {
     /* storage unavailable */
   }
