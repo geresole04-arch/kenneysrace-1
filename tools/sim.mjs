@@ -47,7 +47,7 @@ for (const def of TRACKS) {
   for (const style of ['drift', 'tap']) {
     let best = null;
     for (const la of [8, 11, 14, 17, 20, 24]) {
-      for (const gain of [0.15, 0.25, 0.35, 0.5]) {
+      for (const gain of [0.15, 0.25, 0.35, 0.5, 0.7, 0.9]) {
         const r = run(track, style, la, gain);
         if (!best || r.time < best.time) best = { ...r, la, gain };
       }

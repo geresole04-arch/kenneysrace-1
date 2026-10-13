@@ -1,11 +1,13 @@
 // Ranking storage: Firestore REST API when configured, localStorage otherwise.
-// One collection per track (track.collection, e.g. "scores", "scores_volcan"):
+// One collection per track (track.collection, e.g. "scores", "scores_volcan").
+// One document per player name (id "p_<lowercase name>") holding their best
+// time, so showing the whole ranking costs one read per player:
 // { name: string (1-15 chars), time: number (s), createdAt: timestamp }
+// (older random-id documents from the first version are still read and merged).
 import { FIREBASE } from './config.js';
 
 export const NAME_MAX = 15;
-export const RANKING_SIZE = 10;
-const FETCH_LIMIT = 60;       // fetched to keep only each name's best time
+const FETCH_LIMIT = 300;      // max players shown per track (each one costs a Firestore read)
 const LOCAL_PREFIX = 'kenneysrace.ranking.';
 const BEST_PREFIX = 'kenneysrace.best.';
 const NAME_KEY = 'kenneysrace.name';
@@ -31,10 +33,20 @@ export async function submitScore(collection, name, time) {
     const all = readLocal(collection);
     all.push(entry);
     writeLocal(collection, all);
-    return entry;
+    return { ...entry, improved: true };
   }
-  const res = await fetch(`${BASE}/${collection}?key=${FIREBASE.apiKey}`, {
-    method: 'POST',
+  // Keep only the player's best: skip the write if the stored time is better
+  const url = `${BASE}/${collection}/${encodeURIComponent(playerDocId(entry.name))}?key=${FIREBASE.apiKey}`;
+  const existing = await fetch(url);
+  if (existing.ok) {
+    const doc = await existing.json();
+    const old = Number(doc.fields?.time?.doubleValue ?? doc.fields?.time?.integerValue);
+    if (old <= entry.time) return { ...entry, improved: false, best: old };
+  } else if (existing.status !== 404) {
+    throw new Error(`lookup failed (${existing.status})`);
+  }
+  const res = await fetch(url, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fields: {
@@ -45,10 +57,14 @@ export async function submitScore(collection, name, time) {
     }),
   });
   if (!res.ok) throw new Error(`submit failed (${res.status})`);
-  return entry;
+  return { ...entry, improved: true };
 }
 
-// Best time per name, fastest first.
+function playerDocId(name) {
+  return 'p_' + name.toLowerCase();
+}
+
+// Every player's best time, fastest first (the list scrolls past the top 10).
 export async function fetchRanking(collection) {
   let entries;
   if (!isOnline) {
@@ -74,7 +90,7 @@ export async function fetchRanking(collection) {
         return { name: f.name?.stringValue ?? '?', time: Number(f.time?.doubleValue ?? f.time?.integerValue ?? 0) };
       });
   }
-  return bestPerName(entries).slice(0, RANKING_SIZE);
+  return bestPerName(entries);
 }
 
 export function loadName() {
@@ -135,7 +151,7 @@ function readLocal(collection) {
 
 function writeLocal(collection, entries) {
   try {
-    localStorage.setItem(LOCAL_PREFIX + collection, JSON.stringify(bestPerName(entries).slice(0, 50)));
+    localStorage.setItem(LOCAL_PREFIX + collection, JSON.stringify(bestPerName(entries).slice(0, 300)));
   } catch {
     /* storage unavailable */
   }

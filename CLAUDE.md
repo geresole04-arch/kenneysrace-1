@@ -1,4 +1,4 @@
-# CLAUDE.md — Kenney's Race
+# CLAUDE.md — Kenney Solé's Race
 
 > Llegeix aquest fitxer a l'inici de cada sessió abans de tocar codi.
 
@@ -28,13 +28,20 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
   2 s d'indicació de les zones tàctils/tecles (`intro.js`) → cursa → panell final amb temps,
   nom (màx. 15), rànquing top 10 del circuit, "Jugar otra vez" i "Menú". Botó ✕ per sortir.
   Textos del joc en castellà.
-- **Circuits** (`tracks.js`): `bosque` (fàcil, forma de L de l'usuari, tema bosc) i `volcan`
-  (difícil: carretera més estreta, xicana i forquilla; tema volcànic amb lava, roques i volcans).
+- **Títol** al menú: "KENNEY SOLÉ'S RACE".
+- **Circuits** (`tracks.js`, en ordre de dificultat): `bosque` (fàcil, forma de L de l'usuari,
+  tema bosc), `cielo` (mitjana: revolts tancats sobre un mar de núvols, arcs de Sant Martí —un
+  fa de porta sobre la pista— i globus) i `volcan` (difícil: carretera estreta, xicana i
+  forquilla; lava, roques i volcans).
+- **Rànquing**: es mostren TOTS els jugadors (millor temps de cadascun); ~10 files visibles i la
+  resta es desplaça amb el dit, la roda o arrossegant amb el ratolí (`rankingList.js`).
+- **Cotxe encallat**: si està gairebé aturat 2 s (`STUCK_TIME`), fa marxa enrere sol ~0,9 s
+  encarant el morro cap a la pista.
 - **Pista**: polilínia tancada amb cantonades arrodonides (radi per cantonada), sentit horari
   vist des de dalt. Meta definida per un punt (`finish`); el cotxe surt 8 m abans.
 - **Xoc**: si toca la tanca, el cotxe frena (perd velocitat) i rebota una mica.
 - **Càmera**: orientació fixa (no gira amb el cotxe), alta i inclinada, segueix la posició.
-- **Durada de referència**: bosc ≈ 20 s per a 2 voltes jugant bé; volcà ≈ 30 s.
+- **Durada de referència** (bot drift): bosc ≈ 20 s, cel ≈ 25 s, volcà ≈ 30 s.
 
 ## Stack
 
@@ -52,8 +59,11 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 - Font del HUD: Fredoka (Google Fonts), amb alternativa del sistema.
 - **Rànquing online**: Firebase Cloud Firestore via API REST (sense SDK). Configuració a
   `src/config.js` (`projectId`, `apiKey`); si és buida, rànquing local (localStorage).
-  Una col·lecció per circuit (`scores`, `scores_volcan`). Regles a `firebase/firestore.rules`
-  (només crear; nom 1–15; temps 14–600 s) — cal tornar-les a publicar si s'afegeix un circuit.
+  Una col·lecció per circuit (`scores`, `scores_cielo`, `scores_volcan`) i **un document per
+  jugador** (`p_<nom en minúscules>`) amb el seu millor temps: llegir el rànquing costa una
+  lectura per jugador (quota gratuïta: 50.000 lectures/dia). Regles a `firebase/firestore.rules`
+  (crear vàlid; actualitzar només amb un temps millor; nom 1–15; temps 14–600 s). **Cal tornar-les
+  a publicar a la consola cada cop que s'afegeix un circuit.**
 
 ## Estructura de carpetes
 
@@ -64,10 +74,10 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 ├── src/
 │   ├── main.js         # escena, llums, canvi de circuit, flux menú→intro→cursa→final, bucle
 │   ├── tracks.js       # catàleg de circuits (dades pures: cantonades, radis, amplada, meta)
-│   ├── themes.js       # colors per tema (bosc, volcà)
+│   ├── themes.js       # colors per tema (bosc, cel, volcà)
 │   ├── trackPath.js    # geometria pura (sense Three): línia central, punt més proper, sortida
 │   ├── track.js        # malles de la pista (asfalt, vorals, tanques, línia de meta)
-│   ├── decor.js        # decoració per tema: models Kenney, avets / lava, roques, volcans
+│   ├── decor.js        # decoració per tema: Kenney + avets / núvols, arcs iris, globus / lava, roques
 │   ├── car.js          # física pura del cotxe (acceleració, derrapatge, turbo, xocs)
 │   ├── carModel.js     # model 3D del SUV turquesa
 │   ├── effects.js      # marques de derrapatge i flama de turbo
@@ -78,12 +88,13 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 │   ├── intro.js        # 2 s mostrant les zones de control abans de la sortida
 │   ├── menu.js         # menú principal i rànquing per circuit
 │   ├── endScreen.js    # panell final: temps, nom, rànquing, tornar a jugar / menú
-│   ├── rankingList.js  # pinta un top 10
+│   ├── rankingList.js  # pinta el rànquing complet amb desplaçament (dit, roda, ratolí)
 │   ├── ranking.js      # desar/llegir temps (Firestore REST o localStorage), millor personal
 │   └── config.js       # credencials públiques de Firebase
 ├── firebase/firestore.rules  # regles a enganxar a la consola de Firebase
 ├── tools/sim.mjs       # bots sense gràfics (drift vs tap) a tots els circuits
 ├── tools/checktrack.mjs # valida els traçats (arcs que hi caben, sense solapaments)
+├── tools/release.mjs   # puja la versió anti-memòria cau d'index.html
 ├── lib/three/          # Three.js copiat (MIT)
 ├── assets/models/      # models .glb Kenney (CC0), sense modificar
 ├── CLAUDE.md
@@ -108,6 +119,10 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 - No afegir sons fins que es demani explícitament (desenvolupament per passos).
 - Noms de jugador: sempre amb `textContent` (mai `innerHTML`) i passats per `cleanName`.
 - Desplegament: GitHub Pages des de la branca `main`, arrel `/`.
+- **Abans de cada commit que canviï el joc: `node tools/release.mjs`.** Puja `VERSION` a
+  `index.html` i refà la llista de mòduls de l'import map (tots amb `?v=VERSION`), perquè el
+  navegador no barregi mòduls vells i nous (GitHub Pages deixa en memòria cau 10 min).
+  Per això `index.html` no té `<script type="module">` ni `<link>` d'estils fixos.
 
 ## Estat / fases
 
@@ -116,4 +131,5 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
    el decorat; en acabar la 2a volta el temps es congela (groc, amb centèsimes) i el cotxe s'atura.
 3. [x] Pantalla de final de partida, rànquing (online/local) i reinici.
 4. [x] Derrapatge amb turbo, indicació de controls, menú principal, circuit Volcà + rànquing.
-5. [ ] (Pendent de definir) sons, polit.
+5. [x] Circuit Cel, títol "Kenney Solé's", rànquing complet desplaçable, marxa enrere automàtica.
+6. [ ] (Pendent de definir) sons, polit.

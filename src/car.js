@@ -5,6 +5,8 @@
 //   sideways without losing speed, and releasing it gives a speed BOOST that
 //   grows with the drift length. Drifting through corners is the fast way.
 // - hitting a barrier pushes the car back and brakes it
+// - if the car stays (almost) stopped for STUCK_TIME, it backs up a little on
+//   its own, turning its nose toward the track direction
 
 import { BARRIER_RADIUS } from './trackPath.js';
 
@@ -34,6 +36,13 @@ export const WALL_SPEED_KEEP = 0.45; // fraction of speed kept after a wall hit
 export const WALL_BOUNCE = 0.2;      // fraction of the into-wall speed reflected
 export const COAST_DRAG = 1.2;       // 1/s, slowdown once the throttle is off (after the finish)
 
+// Auto-reverse when stuck
+export const STUCK_SPEED = 2;     // m/s, below this the car counts as stopped
+export const STUCK_TIME = 2;      // s stopped before backing up
+export const REVERSE_TIME = 0.9;  // s of reversing
+export const REVERSE_SPEED = 6;   // m/s
+export const REVERSE_TURN = 2.2;  // rad/s, nose turns toward the track direction
+
 export function createCar(start) {
   return {
     x: start.x,
@@ -48,6 +57,8 @@ export function createCar(start) {
     driftTime: 0,
     boost: 0,       // extra top speed (m/s), decays
     hitWall: false,
+    stuckTime: 0,
+    reversing: 0,   // seconds of auto-reverse left
   };
 }
 
@@ -55,6 +66,20 @@ export function createCar(start) {
 // throttle=false lets the car coast to a stop (used after the finish).
 export function updateCar(car, track, steer, dt, throttle = true) {
   car.steer = steer;
+  if (throttle) {
+    if (car.reversing > 0) {
+      reverseStep(car, track, steer, dt);
+      return;
+    }
+    car.stuckTime = Math.hypot(car.vx, car.vz) < STUCK_SPEED ? car.stuckTime + dt : 0;
+    if (car.stuckTime >= STUCK_TIME) {
+      car.stuckTime = 0;
+      car.reversing = REVERSE_TIME;
+      car.drifting = false;
+      car.driftTime = 0;
+      car.boost = 0;
+    }
+  }
   const dirX = Math.cos(car.heading);
   const dirZ = Math.sin(car.heading);
 
@@ -120,6 +145,23 @@ export function updateCar(car, track, steer, dt, throttle = true) {
   car.x += car.vx * dt;
   car.z += car.vz * dt;
 
+  collide(car, track);
+}
+
+// Backs up along the heading while the nose swings toward the track direction
+// (the player's steer still works, inverted like a real car in reverse).
+function reverseStep(car, track, steer, dt) {
+  car.reversing -= dt;
+  const n = track.nearest(car.x, car.z);
+  let diff = Math.atan2(n.tz, n.tx) - car.heading;
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  const auto = Math.max(-1, Math.min(1, diff * 2));
+  car.heading += (auto - steer * 0.5) * REVERSE_TURN * dt;
+  const k = 1 - Math.exp(-8 * dt);
+  car.vx += (-Math.cos(car.heading) * REVERSE_SPEED - car.vx) * k;
+  car.vz += (-Math.sin(car.heading) * REVERSE_SPEED - car.vz) * k;
+  car.x += car.vx * dt;
+  car.z += car.vz * dt;
   collide(car, track);
 }
 

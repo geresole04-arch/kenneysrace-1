@@ -197,15 +197,47 @@ body {
 }
 
 .rank-list {
-  margin: 8px 0 16px;
+  /* ~10 rows visible, the rest scroll */
+  max-height: 318px;
+  margin: 8px 0 4px;
   padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   list-style: none;
   counter-reset: pos;
   text-align: left;
   font-size: 16px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rank-list.scrollable {
+  cursor: grab;
+  /* fade the bottom edge so it reads as "more below" */
+  -webkit-mask-image: linear-gradient(to bottom, #000 88%, transparent);
+  mask-image: linear-gradient(to bottom, #000 88%, transparent);
+}
+
+.rank-list.dragging {
+  cursor: grabbing;
+}
+
+.rank-hint {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #8a8c9e;
+}
+
+.rank-list ~ .btn-row,
+.rank-list ~ .rank-back {
+  margin-top: 12px;
 }
 
 .rank-list li {
+  min-height: 31.8px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -251,7 +283,7 @@ body {
 
 .menu-title {
   margin: 4px 0 16px;
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 700;
   line-height: 0.95;
   color: #18a9ad;
@@ -272,6 +304,10 @@ body {
 
 .track-card.theme-forest {
   background: linear-gradient(135deg, #4a9b72, #2f7f55 60%, #45454f);
+}
+
+.track-card.theme-sky {
+  background: linear-gradient(135deg, #7ab8ff, #c08cff 55%, #ff7eb6);
 }
 
 .track-card.theme-volcano {

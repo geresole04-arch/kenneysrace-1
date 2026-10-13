@@ -7,7 +7,7 @@ import { formatFinal } from './hud.js';
 export function createMenu(root, { onPlay, onPreview }) {
   root.innerHTML = `
     <div class="panel menu-panel">
-      <div class="menu-title">KENNEY'S<br>RACE</div>
+      <div class="menu-title">KENNEY SOLÉ'S<br>RACE</div>
       <div class="menu-tracks"></div>
       <div class="menu-help">Mantén pulsado para derrapar: ¡al soltar ganas turbo!</div>
     </div>
