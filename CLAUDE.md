@@ -84,6 +84,7 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 ├── firebase/firestore.rules  # regles a enganxar a la consola de Firebase
 ├── tools/sim.mjs       # bots sense gràfics (drift vs tap) a tots els circuits
 ├── tools/checktrack.mjs # valida els traçats (arcs que hi caben, sense solapaments)
+├── tools/release.mjs   # puja la versió anti-memòria cau d'index.html
 ├── lib/three/          # Three.js copiat (MIT)
 ├── assets/models/      # models .glb Kenney (CC0), sense modificar
 ├── CLAUDE.md
@@ -108,6 +109,10 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 - No afegir sons fins que es demani explícitament (desenvolupament per passos).
 - Noms de jugador: sempre amb `textContent` (mai `innerHTML`) i passats per `cleanName`.
 - Desplegament: GitHub Pages des de la branca `main`, arrel `/`.
+- **Abans de cada commit que canviï el joc: `node tools/release.mjs`.** Puja `VERSION` a
+  `index.html` i refà la llista de mòduls de l'import map (tots amb `?v=VERSION`), perquè el
+  navegador no barregi mòduls vells i nous (GitHub Pages deixa en memòria cau 10 min).
+  Per això `index.html` no té `<script type="module">` ni `<link>` d'estils fixos.
 
 ## Estat / fases
 
