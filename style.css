@@ -18,3 +18,35 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+#hud {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fff;
+  font-family: 'Fredoka', 'Arial Rounded MT Bold', system-ui, sans-serif;
+  pointer-events: none;
+  user-select: none;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25), 0 0 12px rgba(0, 0, 0, 0.25);
+}
+
+.hud-time {
+  font-size: clamp(56px, 17vw, 110px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 3px rgba(60, 60, 70, 0.35);
+}
+
+.hud-lap {
+  margin-top: 4px;
+  font-size: clamp(20px, 5.5vw, 32px);
+  font-weight: 500;
+}
+
+#hud.finished .hud-time {
+  color: #ffe066;
+}

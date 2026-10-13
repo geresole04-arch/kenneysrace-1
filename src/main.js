@@ -6,6 +6,8 @@ import { createCar, updateCar } from './car.js';
 import { createCarModel } from './carModel.js';
 import { createCamera } from './camera.js';
 import { createInput } from './input.js';
+import { createRace, startRace, updateRace } from './race.js';
+import { createHud } from './hud.js';
 
 const PHYSICS_STEP = 1 / 120;
 const MAX_FRAME_DT = 1 / 30;
@@ -20,7 +22,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x4a9b72);
 scene.fog = new THREE.Fog(0x4a9b72, 110, 220);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x5a8f6a, 1.6));
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5a8f6a, 1.8));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
 sun.position.set(-20, 40, 15);
 sun.castShadow = true;
@@ -28,9 +30,15 @@ sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 150 });
 scene.add(sun, sun.target);
 
-buildTrack(scene).catch((e) => console.error('Decoration failed to load', e));
-
 const car = createCar(START);
+const race = createRace(car);
+const hud = createHud(document.getElementById('hud'));
+
+// The race (car + timer) starts once the scenery is ready
+buildTrack(scene)
+  .catch((e) => console.error('Decoration failed to load', e))
+  .finally(() => startRace(race));
+
 const carModel = createCarModel();
 scene.add(carModel);
 
@@ -57,9 +65,11 @@ function frame(now) {
 
   acc += dt;
   while (acc >= PHYSICS_STEP) {
-    updateCar(car, steer, PHYSICS_STEP);
+    if (race.state !== 'ready') updateCar(car, steer, PHYSICS_STEP, race.state === 'racing');
+    updateRace(race, car, PHYSICS_STEP);
     acc -= PHYSICS_STEP;
   }
+  hud.update(race);
 
   // Sync visuals
   carModel.position.set(car.x, 0, car.z);

@@ -20,6 +20,7 @@ export const LINE_WIDTH = 0.35;     // yellow strip next to the barrier
 export const BARRIER_OFFSET = ROAD_HALF_WIDTH + KERB_WIDTH + LINE_WIDTH + 0.35; // barrier tube centre
 export const BARRIER_RADIUS = 0.45;
 export const FINISH_X = 40;         // finish line crosses the bottom straight here
+export const FINISH_Z = 105 * TRACK_SCALE; // z of the bottom straight
 const SAMPLE_STEP = 0.75;           // metres between centerline samples
 
 // Builds a closed list of centerline samples: { x, z, tx, tz, nx, nz, s }
@@ -89,7 +90,7 @@ export const TRACK_LENGTH = (() => {
 
 // Start position: on the bottom straight, a few metres before the finish line,
 // facing the driving direction (west, -X).
-export const START = { x: FINISH_X + 8, z: 105 * TRACK_SCALE, heading: Math.PI };
+export const START = { x: FINISH_X + 8, z: FINISH_Z, heading: Math.PI };
 
 // Nearest point on the closed centerline. Returns the segment index, the
 // signed lateral offset (+ = right of driving direction) and the normal there.

@@ -15,6 +15,7 @@ export const CAR_HALF_WIDTH = 0.95;
 export const WALL_LIMIT = BARRIER_OFFSET - BARRIER_RADIUS - CAR_HALF_WIDTH;
 export const WALL_SPEED_KEEP = 0.45; // fraction of speed kept after a wall hit
 export const WALL_BOUNCE = 0.2;      // fraction of the into-wall speed reflected
+export const COAST_DRAG = 1.2;       // 1/s, slowdown once the throttle is off (after the finish)
 
 export function createCar(start) {
   return {
@@ -29,7 +30,8 @@ export function createCar(start) {
 }
 
 // steer in [-1, 1]: -1 left, +1 right (relative to the car).
-export function updateCar(car, steer, dt) {
+// throttle=false lets the car coast to a stop (used after the finish).
+export function updateCar(car, steer, dt, throttle = true) {
   car.steer = steer;
   const dirX = Math.cos(car.heading);
   const dirZ = Math.sin(car.heading);
@@ -39,7 +41,8 @@ export function updateCar(car, steer, dt) {
   let side = car.vx * -dirZ + car.vz * dirX;
 
   // Auto throttle: smooth approach to top speed
-  fwd += (MAX_SPEED - fwd) * (1 - Math.exp(-ACCEL * dt));
+  if (throttle) fwd += (MAX_SPEED - fwd) * (1 - Math.exp(-ACCEL * dt));
+  else fwd *= Math.exp(-COAST_DRAG * dt);
 
   // Steering (weaker when almost stopped)
   const steerScale = Math.min(1, Math.abs(fwd) / TURN_FULL_SPEED);

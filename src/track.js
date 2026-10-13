@@ -1,17 +1,16 @@
 // Builds the visible track: ground, asphalt, kerbs, yellow strip, tube
 // barriers, finish line and Kenney decoration (trees, start arch, stands).
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadDecoration } from './decor.js';
 import {
   CENTERLINE,
-  TRACK_CORNERS,
   ROAD_HALF_WIDTH,
   KERB_WIDTH,
   LINE_WIDTH,
   BARRIER_OFFSET,
   BARRIER_RADIUS,
   FINISH_X,
-  nearestOnTrack,
+  FINISH_Z,
 } from './trackPath.js';
 
 const COLORS = {
@@ -23,8 +22,6 @@ const COLORS = {
   barrier: 0xb3b2e6,
 };
 const KERB_STRIPE = 2.2;   // metres per red/white stripe
-const KENNEY_SCALE = 4.2;  // Kenney Racing Kit units -> metres
-const MODEL_PATH = './assets/models/';
 
 export function buildTrack(scene) {
   const flat = (color) => new THREE.MeshLambertMaterial({ color });
@@ -121,7 +118,7 @@ function quad(pos, p, q, a, b, y) {
 }
 
 function addFinishLine(scene) {
-  const z = finishZ();
+  const z = FINISH_Z;
   const size = 0.9;
   const cols = Math.ceil((ROAD_HALF_WIDTH * 2) / size);
   const canvas = document.createElement('canvas');
@@ -145,84 +142,4 @@ function addFinishLine(scene) {
   line.position.set(FINISH_X, 0.05, z);
   line.receiveShadow = true;
   scene.add(line);
-}
-
-function finishZ() {
-  return TRACK_CORNERS[TRACK_CORNERS.length - 1][1];
-}
-
-// ---------- Kenney models ----------
-
-async function loadDecoration(scene) {
-  const loader = new GLTFLoader();
-  const names = ['treeLarge', 'treeSmall', 'overheadRoundColored', 'grandStandCovered', 'lightPostLarge', 'flagCheckers'];
-  const models = {};
-  await Promise.all(
-    names.map(async (n) => {
-      const gltf = await loader.loadAsync(`${MODEL_PATH}${n}.glb`);
-      gltf.scene.traverse((o) => {
-        if (o.isMesh) {
-          o.castShadow = true;
-          o.receiveShadow = true;
-        }
-      });
-      models[n] = gltf.scene;
-    }),
-  );
-
-  const place = (name, x, z, rotY = 0, scale = KENNEY_SCALE) => {
-    const m = models[name].clone();
-    m.scale.setScalar(scale);
-    m.rotation.y = rotY;
-    m.position.set(x, 0, z);
-    scene.add(m);
-    return m;
-  };
-
-  // Start/finish arch spanning the bottom straight, centred on the road
-  const arch = models.overheadRoundColored.clone();
-  const box = new THREE.Box3().setFromObject(arch);
-  const archScale = ((BARRIER_OFFSET + BARRIER_RADIUS) * 2 + 1) / (box.max.x - box.min.x);
-  arch.scale.setScalar(archScale);
-  const box2 = new THREE.Box3().setFromObject(arch);
-  const archCenterX = (box2.min.x + box2.max.x) / 2;
-  const archCenterZ = (box2.min.z + box2.max.z) / 2;
-  // Rotate so it spans across Z (the road runs along X there)
-  const pivot = new THREE.Group();
-  arch.position.set(-archCenterX, 0, -archCenterZ);
-  pivot.add(arch);
-  pivot.rotation.y = Math.PI / 2;
-  pivot.position.set(FINISH_X, 0, finishZ());
-  scene.add(pivot);
-
-  // Stands and lights outside the bottom straight
-  const zOut = finishZ() + BARRIER_OFFSET + 3;
-  for (let i = 0; i < 4; i++) place('grandStandCovered', 8 + i * KENNEY_SCALE, zOut + KENNEY_SCALE, 0);
-  for (const x of [22, 50]) place('lightPostLarge', x, finishZ() - BARRIER_OFFSET - 1.5, 0, 3.5);
-  place('flagCheckers', FINISH_X + 8, zOut, 0, 3);
-  place('flagCheckers', FINISH_X - 10, zOut, 0, 3);
-
-  // Trees: seeded scatter, kept clear of the track
-  const rand = mulberry32(7);
-  let placed = 0;
-  for (let tries = 0; tries < 3000 && placed < 170; tries++) {
-    const x = -45 + rand() * 160;
-    const z = -45 + rand() * 175;
-    const n = nearestOnTrack(x, z);
-    if (Math.abs(n.offset) < BARRIER_OFFSET + 3.5) continue;
-    if (z > finishZ() + 4 && z < finishZ() + 16 && x > 0 && x < 70) continue; // stands area
-    const big = rand() > 0.35;
-    place(big ? 'treeLarge' : 'treeSmall', x, z, rand() * Math.PI * 2, KENNEY_SCALE * (0.85 + rand() * 0.4));
-    placed++;
-  }
-}
-
-function mulberry32(a) {
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }

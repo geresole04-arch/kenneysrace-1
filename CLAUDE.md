@@ -35,8 +35,12 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 - Sense frameworks ni dependències npm en producció.
 - Gràfics: Kenney **Racing Kit 2.0** (CC0), models `.glb` a `assets/models/`.
 - La pista (asfalt, vorals, tanques en tub) es genera per codi seguint el traçat; els models
-  Kenney s'usen per a la decoració (arbres, arc de meta, grades, fanals, banderes).
-- El cotxe és un SUV low-poly estil **VW T-Cross turquesa** fet amb primitives (el kit no en té).
+  Kenney s'usen per a la decoració (arc de meta, grades, carpes, fanals, banderes).
+- Arbres: avets low-poly per codi (cons apilats, instanciats), 8–12 m d'alt, per quadrar
+  en forma i escala amb el cotxe com a l'original (els del kit són massa diferents).
+- El cotxe és un SUV low-poly estil **VW T-Cross turquesa** amb proporcions reals
+  (4,1 × 1,78 × 1,58 m), fet amb primitives (el kit no en té).
+- Font del HUD: Fredoka (Google Fonts), amb alternativa del sistema.
 
 ## Estructura de carpetes
 
@@ -47,13 +51,14 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
 ├── src/
 │   ├── main.js         # bootstrap: escena, renderer, llums, bucle principal
 │   ├── trackPath.js    # traçat pur (sense Three): línia central, amplades, punt més proper
-│   ├── track.js        # malles de la pista + decoració Kenney
+│   ├── track.js        # malles de la pista (asfalt, vorals, tanques, línia de meta)
+│   ├── decor.js        # decoració: models Kenney + avets
 │   ├── car.js          # física pura del cotxe (acceleració, gir, derrapatge, xoc amb tanques)
 │   ├── carModel.js     # model 3D del SUV turquesa
 │   ├── input.js        # teclat + tàctil -> valor de gir [-1, 1]
 │   ├── camera.js       # càmera elevada d'orientació fixa que segueix el cotxe
-│   ├── race.js         # voltes, cronòmetre  (fase 2)
-│   └── hud.js          # `00:00` i `Vuelta X/2`  (fase 2)
+│   ├── race.js         # estat de cursa pur: cronòmetre i voltes (progrés desenrotllat)
+│   └── hud.js          # `00:00` i `Vuelta X/2` (temps final amb centèsimes)
 ├── tools/sim.mjs       # bot sense gràfics per ajustar temps de volta: `node tools/sim.mjs`
 ├── lib/three/          # Three.js copiat (MIT)
 ├── assets/models/      # models .glb Kenney (CC0), sense modificar
@@ -75,12 +80,14 @@ Minijoc de curses per al navegador (PC i mòbil), recreació d'un joc existent.
   - Teclat: `←`/`A` esquerra, `→`/`D` dreta.
   - Tàctil: tocar/mantenir la meitat esquerra o dreta de la pantalla.
 - Orientació vertical (mòbil) prioritària; ha de funcionar també en horitzontal/PC.
-- No afegir menús, sons ni puntuació fins que es demani explícitament (desenvolupament per passos).
+- No afegir menús ni sons fins que es demani explícitament (desenvolupament per passos).
+  El cronòmetre i el comptador de voltes SÍ formen part del joc base.
 - Desplegament: GitHub Pages des de la branca `main`, arrel `/`.
 
 ## Estat / fases
 
 1. [x] Prototip mínim: pista + cotxe movent-se amb els controls correctes.
-2. [ ] Voltes, cronòmetre i HUD (`00:00`, `Vuelta X/2`).
-3. [ ] Final de partida i reinici.
+2. [x] Voltes, cronòmetre i HUD (`00:00`, `Vuelta X/2`). La cursa comença quan acaba de carregar
+   el decorat; en acabar la 2a volta el temps es congela (groc, amb centèsimes) i el cotxe s'atura.
+3. [ ] Pantalla de final de partida i reinici.
 4. [ ] (Pendent de definir) menús, sons, polit.
