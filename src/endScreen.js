@@ -1,31 +1,37 @@
-// End-of-race panel: final time, name entry (max 15 chars), top-10 ranking
-// and "play again". Texts in Spanish to match the in-game HUD.
-import { NAME_MAX, isOnline, cleanName, roundTime, submitScore, fetchRanking, loadName } from './ranking.js';
+// End-of-race panel: final time, name entry (max 15 chars), the track's
+// top-10 ranking, "play again" and "menu". Texts in Spanish like the HUD.
+import { NAME_MAX, isOnline, cleanName, roundTime, submitScore, loadName, saveBest } from './ranking.js';
+import { renderRanking } from './rankingList.js';
 import { formatFinal } from './hud.js';
 
-export function createEndScreen(root, { onRestart }) {
+export function createEndScreen(root, { onRestart, onMenu }) {
   root.innerHTML = `
-    <div class="end-panel">
+    <div class="panel">
       <div class="end-title">¡META!</div>
+      <div class="end-track"></div>
       <div class="end-time"></div>
+      <div class="end-record" hidden>¡Nuevo récord personal!</div>
       <form class="end-form">
         <input class="end-name" type="text" maxlength="${NAME_MAX}" placeholder="Tu nombre"
           autocomplete="nickname" enterkeyhint="send" spellcheck="false" aria-label="Nombre">
-        <button class="end-save" type="submit">Guardar</button>
+        <button class="btn" type="submit">Guardar</button>
       </form>
       <div class="end-msg" role="status"></div>
-      <div class="end-ranking-title">Ranking${isOnline ? '' : ' <small>(solo este dispositivo)</small>'}</div>
-      <ol class="end-ranking"></ol>
-      <button class="end-restart" type="button">Jugar otra vez</button>
+      <div class="rank-title">Ranking${isOnline ? '' : ' <small>(solo este dispositivo)</small>'}</div>
+      <ol class="rank-list"></ol>
+      <div class="btn-row">
+        <button class="btn btn-ghost end-menu" type="button">Menú</button>
+        <button class="btn btn-red end-restart" type="button">Jugar otra vez</button>
+      </div>
     </div>`;
   const $ = (s) => root.querySelector(s);
   const form = $('.end-form');
   const input = $('.end-name');
-  const save = $('.end-save');
+  const save = form.querySelector('button');
   const msg = $('.end-msg');
-  const list = $('.end-ranking');
+  const list = $('.rank-list');
   let time = 0;
-  let saved = null;
+  let track = null;
 
   input.addEventListener('input', () => {
     // Enforce 15 characters even for emoji / composed input
@@ -43,10 +49,10 @@ export function createEndScreen(root, { onRestart }) {
     save.disabled = input.disabled = true;
     msg.textContent = 'Guardando…';
     try {
-      saved = await submitScore(name, time);
+      const saved = await submitScore(track.collection, name, time);
       msg.textContent = '¡Tiempo guardado!';
       form.hidden = true;
-      await refresh();
+      await renderRanking(list, track.collection, saved.name);
     } catch (err) {
       console.error(err);
       msg.textContent = 'No se ha podido guardar. Inténtalo otra vez.';
@@ -54,59 +60,29 @@ export function createEndScreen(root, { onRestart }) {
     }
   });
 
+  const hide = () => (root.hidden = true);
   $('.end-restart').addEventListener('click', () => {
     hide();
     onRestart();
   });
-
-  async function refresh() {
-    list.innerHTML = '<li class="end-empty">Cargando…</li>';
-    try {
-      const rows = await fetchRanking();
-      list.replaceChildren(
-        ...(rows.length ? rows.map(row) : [emptyRow('Todavía no hay tiempos. ¡Sé el primero!')]),
-      );
-    } catch (err) {
-      console.error(err);
-      list.replaceChildren(emptyRow('No se ha podido cargar el ranking'));
-    }
-  }
-
-  function row(entry) {
-    const li = document.createElement('li');
-    const name = document.createElement('span');
-    name.className = 'end-row-name';
-    name.textContent = entry.name;
-    const t = document.createElement('span');
-    t.className = 'end-row-time';
-    t.textContent = formatFinal(entry.time);
-    li.append(name, t);
-    if (saved && entry.name.toLowerCase() === saved.name.toLowerCase()) li.classList.add('me');
-    return li;
-  }
-
-  function emptyRow(text) {
-    const li = document.createElement('li');
-    li.className = 'end-empty';
-    li.textContent = text;
-    return li;
-  }
-
-  function hide() {
-    root.hidden = true;
-  }
+  $('.end-menu').addEventListener('click', () => {
+    hide();
+    onMenu();
+  });
 
   return {
-    show(raceTime) {
+    show(raceTime, trackDef) {
       time = roundTime(raceTime);
-      saved = null;
+      track = trackDef;
+      $('.end-track').textContent = `${trackDef.name} · ${trackDef.subtitle}`;
       $('.end-time').textContent = formatFinal(time);
+      $('.end-record').hidden = !saveBest(trackDef.id, time);
       form.hidden = false;
       save.disabled = input.disabled = false;
       input.value = loadName();
       msg.textContent = '';
       root.hidden = false;
-      refresh();
+      renderRanking(list, track.collection);
       // Don't pop the mobile keyboard automatically; focus only with a real keyboard
       if (matchMedia('(pointer: fine)').matches) input.focus();
     },

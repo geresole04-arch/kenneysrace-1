@@ -1,38 +1,53 @@
 // Pure track geometry (no Three.js) so it can also run in Node for tuning.
 // World plane is X/Z; +Z points "down" on screen (fixed camera looks toward -Z).
+//
+// A track definition (see tracks.js) lists the corner points of a closed
+// polyline; every corner is rounded with an arc. createTrackPath() turns it
+// into dense centerline samples plus helpers used by physics, race and meshes.
 
-// Track layout from the user's sketch (L shape), driven clockwise on screen.
-// Corner points of the centerline, in metres.
-const TRACK_SCALE = 0.8;
-export const TRACK_CORNERS = [
-  [0, 0],
-  [36, 0],
-  [36, 45],
-  [86, 45],
-  [86, 105],
-  [0, 105],
-].map(([x, z]) => [x * TRACK_SCALE, z * TRACK_SCALE]);
-
-export const CORNER_RADIUS = 11;   // centerline radius of every corner
-export const ROAD_HALF_WIDTH = 6.5; // asphalt half width
-export const KERB_WIDTH = 0.8;      // red/white kerb strip
-export const LINE_WIDTH = 0.35;     // yellow strip next to the barrier
-export const BARRIER_OFFSET = ROAD_HALF_WIDTH + KERB_WIDTH + LINE_WIDTH + 0.35; // barrier tube centre
+export const KERB_WIDTH = 0.8;   // red/white kerb strip
+export const LINE_WIDTH = 0.35;  // strip next to the barrier
 export const BARRIER_RADIUS = 0.45;
-export const FINISH_X = 40;         // finish line crosses the bottom straight here
-export const FINISH_Z = 105 * TRACK_SCALE; // z of the bottom straight
-const SAMPLE_STEP = 0.75;           // metres between centerline samples
+const START_TO_LINE = 8;         // the car starts this many metres before the finish line
+const SAMPLE_STEP = 0.75;        // metres between centerline samples
 
-// Builds a closed list of centerline samples: { x, z, tx, tz, nx, nz, s }
+export function createTrackPath(def) {
+  const roadHalfWidth = def.roadHalfWidth;
+  const barrierOffset = roadHalfWidth + KERB_WIDTH + LINE_WIDTH + 0.35; // barrier tube centre
+  const centerline = buildCenterline(def.corners, def.radius);
+  const last = centerline[centerline.length - 1];
+  const length = last.s + Math.hypot(centerline[0].x - last.x, centerline[0].z - last.z);
+
+  const nearest = (x, z) => nearestOn(centerline, x, z);
+  const at = (s) => pointAt(centerline, length, s);
+
+  const finishP = at(nearest(def.finish[0], def.finish[1]).s);
+  const startP = at(finishP.s - START_TO_LINE);
+
+  return {
+    def,
+    centerline,
+    length,
+    roadHalfWidth,
+    barrierOffset,
+    nearest,
+    at,
+    finish: finishP,
+    start: { x: startP.x, z: startP.z, heading: Math.atan2(startP.tz, startP.tx) },
+    startToLine: START_TO_LINE,
+  };
+}
+
+// Closed list of centerline samples: { x, z, tx, tz, nx, nz, s }
 // t = unit tangent (driving direction), n = unit normal pointing to the driver's right.
-function buildCenterline() {
-  const pts = [];
-  const n = TRACK_CORNERS.length;
-  const R = CORNER_RADIUS;
-  // For each corner, compute tangent entry/exit points of the fillet arc.
-  const fillets = TRACK_CORNERS.map((c, i) => {
-    const prev = TRACK_CORNERS[(i - 1 + n) % n];
-    const next = TRACK_CORNERS[(i + 1) % n];
+function buildCenterline(corners, radius) {
+  const n = corners.length;
+  const radiusAt = (i) => (Array.isArray(radius) ? radius[i] : radius);
+  // For each corner, tangent entry/exit points of the fillet arc.
+  const fillets = corners.map((c, i) => {
+    const R = radiusAt(i);
+    const prev = corners[(i - 1 + n) % n];
+    const next = corners[(i + 1) % n];
     const inDir = norm(c[0] - prev[0], c[1] - prev[1]);
     const outDir = norm(next[0] - c[0], next[1] - c[1]);
     const cross = inDir[0] * outDir[1] - inDir[1] * outDir[0]; // >0 = right turn (with +Z down)
@@ -40,22 +55,20 @@ function buildCenterline() {
     const cut = R * Math.tan(angle / 2);
     const start = [c[0] - inDir[0] * cut, c[1] - inDir[1] * cut];
     const end = [c[0] + outDir[0] * cut, c[1] + outDir[1] * cut];
-    const side = Math.sign(cross); // +1 right, -1 left
-    // Arc centre lies on the normal of inDir, toward the turn.
+    const side = Math.sign(cross) || 1; // +1 right, -1 left
     const right = [-inDir[1], inDir[0]];
     const centre = [start[0] + right[0] * R * side, start[1] + right[1] * R * side];
-    return { start, end, centre, angle, side };
+    return { start, end, centre, angle, side, R };
   });
 
+  const pts = [];
   for (let i = 0; i < n; i++) {
     const f = fillets[i];
-    // Arc of corner i
     const a0 = Math.atan2(f.start[1] - f.centre[1], f.start[0] - f.centre[0]);
-    const arcLen = f.angle * R;
-    const arcSteps = Math.max(2, Math.ceil(arcLen / SAMPLE_STEP));
+    const arcSteps = Math.max(2, Math.ceil((f.angle * f.R) / SAMPLE_STEP));
     for (let k = 0; k < arcSteps; k++) {
       const a = a0 + f.side * f.angle * (k / arcSteps);
-      pts.push([f.centre[0] + Math.cos(a) * R, f.centre[1] + Math.sin(a) * R]);
+      pts.push([f.centre[0] + Math.cos(a) * f.R, f.centre[1] + Math.sin(a) * f.R]);
     }
     // Straight from this corner's exit to the next corner's entry
     const g = fillets[(i + 1) % n];
@@ -67,7 +80,6 @@ function buildCenterline() {
     }
   }
 
-  // Tangents, normals and arc length
   const out = [];
   let s = 0;
   for (let i = 0; i < pts.length; i++) {
@@ -81,21 +93,9 @@ function buildCenterline() {
   return out;
 }
 
-export const CENTERLINE = buildCenterline();
-export const TRACK_LENGTH = (() => {
-  const a = CENTERLINE[CENTERLINE.length - 1];
-  const b = CENTERLINE[0];
-  return a.s + Math.hypot(b.x - a.x, b.z - a.z);
-})();
-
-// Start position: on the bottom straight, a few metres before the finish line,
-// facing the driving direction (west, -X).
-export const START = { x: FINISH_X + 8, z: FINISH_Z, heading: Math.PI };
-
-// Nearest point on the closed centerline. Returns the segment index, the
-// signed lateral offset (+ = right of driving direction) and the normal there.
-export function nearestOnTrack(x, z) {
-  const pts = CENTERLINE;
+// Nearest point on the closed centerline: segment index, distance along the
+// track (s) and signed lateral offset (+ = right of driving direction).
+function nearestOn(pts, x, z) {
   let best = Infinity;
   let bestI = 0;
   let bestT = 0;
@@ -104,8 +104,7 @@ export function nearestOnTrack(x, z) {
     const b = pts[(i + 1) % pts.length];
     const dx = b.x - a.x;
     const dz = b.z - a.z;
-    const len2 = dx * dx + dz * dz;
-    const t = clamp(((x - a.x) * dx + (z - a.z) * dz) / len2, 0, 1);
+    const t = clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz), 0, 1);
     const px = a.x + dx * t - x;
     const pz = a.z + dz * t - z;
     const d2 = px * px + pz * pz;
@@ -123,12 +122,27 @@ export function nearestOnTrack(x, z) {
   const nx = -tz;
   const nz = tx;
   const offset = (x - cx) * nx + (z - cz) * nz;
-  return { index: bestI, t: bestT, cx, cz, tx, tz, nx, nz, offset, s: a.s + Math.hypot(b.x - a.x, b.z - a.z) * bestT };
+  return { index: bestI, cx, cz, tx, tz, nx, nz, offset, s: a.s + Math.hypot(b.x - a.x, b.z - a.z) * bestT };
 }
 
-// Points offset from the centerline (closed loop), for building meshes.
-export function offsetLoop(offset) {
-  return CENTERLINE.map((p) => [p.x + p.nx * offset, p.z + p.nz * offset]);
+// Interpolated centerline point at distance s (wraps around).
+function pointAt(pts, length, s) {
+  s = ((s % length) + length) % length;
+  let i = 0;
+  while (i < pts.length - 1 && pts[i + 1].s <= s) i++;
+  const a = pts[i];
+  const b = pts[(i + 1) % pts.length];
+  const segLen = (i + 1 < pts.length ? b.s : length) - a.s;
+  const t = segLen > 0 ? (s - a.s) / segLen : 0;
+  return {
+    x: a.x + (b.x - a.x) * t,
+    z: a.z + (b.z - a.z) * t,
+    tx: a.tx,
+    tz: a.tz,
+    nx: a.nx,
+    nz: a.nz,
+    s,
+  };
 }
 
 function norm(x, z) {

@@ -1,0 +1,29 @@
+// Colour themes for the track meshes, sky and lights.
+export const THEMES = {
+  forest: {
+    background: 0x4a9b72,
+    fog: [0x4a9b72, 110, 220],
+    ground: 0x4a9b72,
+    asphalt: 0x45454f,
+    kerbA: 0xd8473f,
+    kerbB: 0xeeeef2,
+    line: 0xf2c531,
+    barrier: 0xb3b2e6,
+    hemi: [0xffffff, 0x5a8f6a, 1.8],
+    sun: [0xffffff, 1.6],
+    skid: 0x2a2a30,
+  },
+  volcano: {
+    background: 0x2b1d1b,
+    fog: [0x3a2320, 90, 200],
+    ground: 0x3b3230,
+    asphalt: 0x2a282d,
+    kerbA: 0xff6a1a,
+    kerbB: 0x1d1b1e,
+    line: 0xffb000,
+    barrier: 0x5d5560,
+    hemi: [0xffd6b8, 0x6a2a18, 1.5],
+    sun: [0xffb98f, 1.9],
+    skid: 0x111013,
+  },
+};

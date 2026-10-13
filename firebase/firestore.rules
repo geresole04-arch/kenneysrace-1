@@ -1,11 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Online ranking for Kenney's Race: anyone can read; anyone can add a
-    // score that passes these checks; nobody can edit or delete from the web.
-    match /scores/{id} {
-      allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['name', 'time', 'createdAt'])
+    // Online rankings for Kenney's Race, one collection per track
+    // (scores = Bosque, scores_volcan = Volcán). Anyone can read; anyone can
+    // add a score that passes these checks; nobody can edit or delete.
+    match /{track}/{id} {
+      allow read: if track in ['scores', 'scores_volcan'];
+      allow create: if track in ['scores', 'scores_volcan']
+        && request.resource.data.keys().hasOnly(['name', 'time', 'createdAt'])
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 15

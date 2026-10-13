@@ -4,6 +4,8 @@ Minijoc de curses per al navegador (PC i mòbil). El cotxe accelera sol; tu nom�
 
 - Teclat: `←`/`A` i `→`/`D`
 - Mòbil: mantén premuda la meitat esquerra o dreta de la pantalla
+- Mantén el gir als revolts per derrapar: en deixar-lo anar, turbo
+- Dos circuits: Bosque (fàcil) i Volcán (difícil), cadascun amb el seu rànquing
 
 Executar en local: `npx http-server .` i obrir `http://localhost:8080`.
 
