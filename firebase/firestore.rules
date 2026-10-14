@@ -2,11 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Online rankings for Kenney Solé's Race, one collection per track:
-    // scores = Bosque, scores_cielo = Cielo, scores_volcan = Volcán.
+    // scores = Bosque, scores_cielo = Cielo, scores_volcan = Volcán, scores_monaco = Mónaco.
     // One document per player keeps their best time: anyone can read, create
     // a valid score, or replace their own with a FASTER one. No deletes.
     function isTrack(track) {
-      return track in ['scores', 'scores_cielo', 'scores_volcan'];
+      return track in ['scores', 'scores_cielo', 'scores_volcan', 'scores_monaco'];
     }
     function validScore() {
       let d = request.resource.data;

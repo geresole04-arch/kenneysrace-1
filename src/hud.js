@@ -1,5 +1,4 @@
 // On-screen timer ("00:09") and lap counter ("Vuelta 1/2"), like the original.
-import { TOTAL_LAPS } from './race.js';
 
 export function createHud(root) {
   root.innerHTML = '<div class="hud-time">00:00</div><div class="hud-lap"></div>';
@@ -11,7 +10,7 @@ export function createHud(root) {
   return {
     update(race) {
       const t = race.state === 'finished' ? formatFinal(race.time) : formatTime(race.time);
-      const l = `Vuelta ${race.lap}/${TOTAL_LAPS}`;
+      const l = `Vuelta ${race.lap}/${race.laps}`;
       if (t !== lastTime) timeEl.textContent = lastTime = t;
       if (l !== lastLap) lapEl.textContent = lastLap = l;
       root.classList.toggle('finished', race.state === 'finished');

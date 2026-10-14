@@ -1,4 +1,4 @@
-// Headless tuning helper: bots drive 2 laps on every track and print times.
+// Headless tuning helper: bots drive a full race on every track and print times.
 // "drift" holds the steer through corners, "tap" pulses it instead.
 // Drifting should be clearly the fastest.
 // Usage: node tools/sim.mjs

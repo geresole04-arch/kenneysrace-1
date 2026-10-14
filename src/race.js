@@ -2,7 +2,7 @@
 // Progress is the distance driven along the centerline, unwrapped, so driving
 // backwards undoes progress and laps can't be skipped.
 
-export const TOTAL_LAPS = 2;
+export const DEFAULT_LAPS = 2; // tracks can override with def.laps
 
 export function createRace(car, track) {
   return {
@@ -11,6 +11,7 @@ export function createRace(car, track) {
     progress: 0,
     lastS: track.nearest(car.x, car.z).s,
     lap: 1,
+    laps: track.def.laps ?? DEFAULT_LAPS,
   };
 }
 
@@ -33,13 +34,13 @@ export function updateRace(race, car, track, dt) {
   // Distance past the line since lap 1 began (crossing the line at the start
   // is the beginning of lap 1).
   const past = race.progress - track.startToLine;
-  if (past >= TOTAL_LAPS * L) {
+  if (past >= race.laps * L) {
     // Interpolate the exact crossing moment inside this step
-    const over = past - TOTAL_LAPS * L;
+    const over = past - race.laps * L;
     race.time -= ds > 0 ? (over / ds) * dt : 0;
-    race.lap = TOTAL_LAPS;
+    race.lap = race.laps;
     race.state = 'finished';
     return;
   }
-  race.lap = Math.min(TOTAL_LAPS, Math.max(1, Math.floor(past / L) + 1));
+  race.lap = Math.min(race.laps, Math.max(1, Math.floor(past / L) + 1));
 }

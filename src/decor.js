@@ -2,9 +2,12 @@
 // - forest: Kenney stands, tents, lights and flags + large low-poly pines.
 // - volcano: background volcanoes, glowing lava pools and basalt rocks.
 // - sky: a sea of clouds, rainbows (one as a gate over the track) and balloons.
+// - city (Monaco): harbour with yachts, pastel buildings with terracotta roofs,
+//   palm trees and grandstands.
 // Both get the Kenney red/white start arch over the finish line.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BARRIER_RADIUS } from './trackPath.js';
 
 const MODEL_PATH = './assets/models/';
@@ -36,6 +39,18 @@ const SKY = {
   balloons: [0xff6b9a, 0xffc94d, 0x6be0a0, 0x7ab8ff, 0xc08cff],
 };
 
+const CITY = {
+  sea: 0x2a8fd6,
+  quay: 0xe8e0cf,
+  buildingCount: 110,
+  buildingColors: [0xf2d6b3, 0xf6c9a8, 0xe9e2d0, 0xf4b9a0, 0xd8e3c4, 0xf7e4a3, 0xffffff],
+  roof: 0xc4673c,
+  palmCount: 70,
+  trunk: 0x9b7653,
+  fronds: 0x3f9b4f,
+  yachtCount: 16,
+};
+
 const modelCache = new Map();
 
 export async function loadDecoration(group, track, theme) {
@@ -54,6 +69,7 @@ export async function loadDecoration(group, track, theme) {
   addArch(group, track, models.overheadRoundColored);
   if (theme === 'volcano') decorateVolcano(group, track, place, occupied);
   else if (theme === 'sky') decorateSky(group, track, place, occupied);
+  else if (theme === 'city') decorateCity(group, track, place, occupied);
   else decorateForest(group, track, place, occupied);
 }
 
@@ -280,6 +296,134 @@ function addBalloon(group, x, y, z, size, color) {
   group.add(balloon);
 }
 
+// ---------- City (Monaco) ----------
+
+function decorateCity(group, track, place, occupied) {
+  const { x: fx, z: fz } = track.finish;
+  const bo = track.barrierOffset;
+  // Grandstands along the outside of the start straight, flags on the inside
+  // (the start straight runs up the screen: outside is -X; the stand's depth
+  // extends away from the road and its seats face it)
+  for (let i = 0; i < 4; i++) {
+    const z = fz - 10 - i * PROP_SCALE;
+    place('grandStandCovered', fx - bo - 1.5, z, Math.PI / 2, PROP_SCALE);
+    occupied.push({ x: fx - bo - 1.5 - PROP_SCALE / 2, z: z - PROP_SCALE / 2, r: PROP_SCALE * 0.75 });
+  }
+  for (const dz of [-6, 6]) place('flagCheckers', fx + bo + 2, fz + dz, Math.PI / 2, 5, 2);
+
+  // Harbour: the sea fills the open area south-east of the track, outside the
+  // loop (measured on the Monaco layout: the road never enters this corner)
+  const sea = { minX: 58, minZ: 33 };
+  const inSea = (x, z, r = 0) => x + r > sea.minX && z + r > sea.minZ;
+  const seaPlane = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshLambertMaterial({ color: CITY.sea }));
+  seaPlane.rotation.x = -Math.PI / 2;
+  seaPlane.position.set(sea.minX + 300, 0.04, sea.minZ + 300);
+  group.add(seaPlane);
+  // Quay edges along the two sea borders
+  const quayMat = new THREE.MeshLambertMaterial({ color: CITY.quay });
+  for (const [w, d, x, z] of [
+    [600, 2, sea.minX + 300, sea.minZ],
+    [2, 600, sea.minX, sea.minZ + 300],
+  ]) {
+    const quay = new THREE.Mesh(new THREE.BoxGeometry(w, 0.8, d), quayMat);
+    quay.position.set(x, 0.4, z);
+    quay.receiveShadow = true;
+    group.add(quay);
+  }
+
+  // Yachts moored in the harbour
+  const rand = mulberry32(31);
+  for (let i = 0, tries = 0; i < CITY.yachtCount && tries < 400; tries++) {
+    const x = sea.minX + 12 + rand() * 110;
+    const z = sea.minZ + 10 + rand() * 120;
+    if (occupied.some((o) => o.r && Math.hypot(o.x - x, o.z - z) < o.r + 7)) continue;
+    occupied.push({ x, z, r: 6 });
+    addYacht(group, x, z, rand() < 0.5 ? 0 : Math.PI / 2 + (rand() - 0.5) * 0.3, 0.8 + rand() * 0.6);
+    i++;
+  }
+
+  // Pastel buildings with terracotta roofs, kept back from the road so they
+  // don't hide it from the high camera
+  const buildings = scatter(track, occupied, {
+    seed: 41,
+    count: CITY.buildingCount,
+    size: (r) => 8 + r() * 10,
+    radius: (s) => s * 0.72,
+    clearance: (s) => s * 0.7 + 7,
+    reject: (x, z, r) => inSea(x, z, r + 4),
+  });
+  const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const byColor = CITY.buildingColors.map(() => []);
+  const roofs = [];
+  for (const [i, bld] of buildings.entries()) {
+    const h = 7 + ((bld.rot * 1000) % 1) * 15;
+    const w = bld.size;
+    const d = bld.size * (0.7 + ((bld.rot * 77) % 0.5));
+    const rot = Math.round(bld.rot / (Math.PI / 2)) * (Math.PI / 2) + (((bld.rot * 13) % 0.4) - 0.2);
+    byColor[i % byColor.length].push(compose(bld.x, 0, bld.z, rot, w, h, d));
+    roofs.push(compose(bld.x, h, bld.z, rot, w * 1.04, 0.7, d * 1.04));
+  }
+  byColor.forEach((mats, k) => {
+    if (mats.length) group.add(instanced(box, new THREE.MeshLambertMaterial({ color: CITY.buildingColors[k] }), mats));
+  });
+  group.add(instanced(box, new THREE.MeshLambertMaterial({ color: CITY.roof, flatShading: true }), roofs));
+
+  // Palm trees: some lining the road, the rest scattered
+  const palms = scatter(track, occupied, {
+    seed: 53,
+    count: CITY.palmCount,
+    margin: 25,
+    size: (r) => 7 + r() * 4,
+    radius: () => 1.6,
+    clearance: () => 1.2,
+    reject: (x, z) => inSea(x, z, 2),
+  });
+  const trunk = new THREE.CylinderGeometry(0.16, 0.26, 1, 6).translate(0, 0.5, 0);
+  const crown = palmCrown();
+  group.add(instanced(trunk, new THREE.MeshLambertMaterial({ color: CITY.trunk, flatShading: true }), palms.map((p) => compose(p.x, 0, p.z, p.rot, 1, p.size, 1))));
+  group.add(instanced(crown, new THREE.MeshLambertMaterial({ color: CITY.fronds, flatShading: true }), palms.map((p) => compose(p.x, p.size, p.z, p.rot, 1, 1, 1))));
+}
+
+// Seven drooping fronds around the top of the trunk, merged into one geometry.
+function palmCrown() {
+  const parts = [];
+  for (let i = 0; i < 7; i++) {
+    const leaf = new THREE.ConeGeometry(0.55, 3.6, 4);
+    leaf.rotateZ(-Math.PI / 2 - 0.35); // lie out sideways, drooping
+    leaf.translate(1.6, -0.35, 0);
+    leaf.rotateY((i / 7) * Math.PI * 2);
+    parts.push(leaf);
+  }
+  return mergeGeometries(parts);
+}
+
+function addYacht(group, x, z, rotY, scale) {
+  const yacht = new THREE.Group();
+  const white = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x1f2a3a });
+  const hullShape = new THREE.Shape();
+  hullShape.moveTo(-5, -1.2);
+  hullShape.lineTo(3.5, -1.2);
+  hullShape.lineTo(6, 0);
+  hullShape.lineTo(3.5, 1.2);
+  hullShape.lineTo(-5, 1.2);
+  hullShape.closePath();
+  const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(hullShape, { depth: 1.4, bevelEnabled: false }), white);
+  hull.rotation.x = -Math.PI / 2; // shape lies flat, extrudes upward
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(5, 1.2, 1.9), white);
+  cabin.position.set(-0.8, 2, 0);
+  const windows = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.45, 1.95), dark);
+  windows.position.set(-0.8, 2.1, 0);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.25, 2.45), new THREE.MeshLambertMaterial({ color: 0x2a5d9f }));
+  stripe.position.set(-0.6, 1.05, 0);
+  yacht.add(hull, cabin, windows, stripe);
+  yacht.scale.setScalar(scale);
+  yacht.rotation.y = rotY;
+  yacht.position.set(x, 0.05, z);
+  yacht.traverse((o) => o.isMesh && (o.castShadow = true));
+  group.add(yacht);
+}
+
 // ---------- Shared helpers ----------
 
 async function loadModels(names) {
@@ -329,7 +473,7 @@ function bounds(track) {
 }
 
 // Random positions around the track that keep clear of the road and of each other.
-function scatter(track, occupied, { seed, count, size, radius, margin = 60 }) {
+function scatter(track, occupied, { seed, count, size, radius, margin = 60, clearance = radius, reject = null }) {
   const b = bounds(track);
   const rand = mulberry32(seed);
   const out = [];
@@ -338,7 +482,9 @@ function scatter(track, occupied, { seed, count, size, radius, margin = 60 }) {
     const z = b.minZ - margin + rand() * (b.maxZ - b.minZ + margin * 2 + 20);
     const s = size(rand);
     const r = radius(s);
-    if (Math.abs(track.nearest(x, z).offset) < track.barrierOffset + r + 0.5) continue;
+    if (reject?.(x, z, r)) continue;
+    if (occupied.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r)) continue;
+    if (Math.abs(track.nearest(x, z).offset) < track.barrierOffset + clearance(s) + 0.5) continue;
     if (occupied.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r)) continue;
     occupied.push({ x, z, r: r * 0.8 });
     out.push({ x, z, size: s, rot: rand() * Math.PI * 2 });
