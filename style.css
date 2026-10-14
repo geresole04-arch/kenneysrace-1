@@ -310,6 +310,10 @@ body {
   background: linear-gradient(135deg, #7ab8ff, #c08cff 55%, #ff7eb6);
 }
 
+.track-card.theme-city {
+  background: linear-gradient(135deg, #e32b2b, #c22020 45%, #2a8fd6);
+}
+
 .track-card.theme-volcano {
   background: linear-gradient(135deg, #3b3230, #2a1d1b 55%, #ff5a14);
 }

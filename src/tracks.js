@@ -4,6 +4,7 @@
 const FOREST_SCALE = 0.8;
 const VOLCANO_SCALE = 0.82;
 const SKY_SCALE = 0.85;
+const MONACO_SCALE = 0.21; // metres per pixel of the reference drawing
 
 export const TRACKS = [
   {
@@ -49,7 +50,31 @@ export const TRACKS = [
     finish: [25, 0],
     collection: 'scores_volcan',
   },
+  {
+    id: 'monaco',
+    name: 'Mónaco',
+    subtitle: 'Experto · 1 vuelta',
+    theme: 'city',
+    laps: 1,
+    // Traced from the user's Monaco drawing (pixels -> metres), simplified so
+    // the road never overlaps: long left straight, Casino climb, Loews hairpin,
+    // tunnel sweep, harbour chicane, swimming pool and Rascasse.
+    corners: MONACO_PX().map(([x, y]) => [(x - 440) * MONACO_SCALE, (y - 445) * MONACO_SCALE]),
+    radius: 8,
+    roadHalfWidth: 5,
+    finish: [0, 430 * MONACO_SCALE], // on the long left straight
+    collection: 'scores_monaco',
+  },
 ];
+
+function MONACO_PX() {
+  return [
+    [445, 960], [440, 700], [465, 580], [540, 445], [880, 430], [1075, 420], [1135, 370], [1100, 290],
+    [1130, 220], [1200, 125], [1300, 70], [1310, 250], [1390, 250], [1390, 110], [1480, 100], [1460, 260],
+    [1340, 410], [1135, 500], [900, 515], [870, 550], [600, 535], [560, 600], [550, 680], [565, 790],
+    [535, 845], [565, 905], [640, 975], [668, 1045], [500, 1030], [480, 995],
+  ];
+}
 
 function SKY_CORNERS() {
   return [
