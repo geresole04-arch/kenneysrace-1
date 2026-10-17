@@ -4,6 +4,8 @@
 // - sky: a sea of clouds, rainbows (one as a gate over the track) and balloons.
 // - city (Monaco): harbour with yachts, pastel buildings with terracotta roofs,
 //   palm trees and grandstands.
+// - eifel (Nürburgring): the "Green Hell" — dense pines along the whole lap,
+//   Nürburg castle in the middle, hills on the horizon, grandstands.
 // Both get the Kenney red/white start arch over the finish line.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -30,6 +32,17 @@ const VOLCANO = {
   mountain: 0x3a2b27,
 };
 
+const EIFEL = {
+  treeCount: 2000,
+  treeHeight: [9, 14],
+  forestBand: 70, // trees only within this distance of the road
+  leaves: 0x226b45,
+  leavesDark: 0x1b5a39,
+  trunk: 0x8a5232,
+  hill: 0x3f7f55,
+  stone: 0x9a958c,
+  roof: 0x5b4a6b,
+};
 const SKY = {
   cloudCount: 150,
   cloudSize: [4, 12],
@@ -70,6 +83,7 @@ export async function loadDecoration(group, track, theme) {
   if (theme === 'volcano') decorateVolcano(group, track, place, occupied);
   else if (theme === 'sky') decorateSky(group, track, place, occupied);
   else if (theme === 'city') decorateCity(group, track, place, occupied);
+  else if (theme === 'eifel') decorateEifel(group, track, place, occupied);
   else decorateForest(group, track, place, occupied);
 }
 
@@ -90,22 +104,110 @@ function decorateForest(group, track, place, occupied) {
   place('tentLong', -24, 46, Math.PI / 2, PROP_SCALE, 8);
   for (const z of [10, 37, 62]) place('lightPostLarge', -bo - 3, z, Math.PI / 2, 7, 2);
 
-  const flat = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
-  // Stacked-cone pines like the original game; unit tree is 1 m tall.
-  const parts = [
-    [new THREE.CylinderGeometry(0.05, 0.065, 0.2, 6).translate(0, 0.1, 0), flat(FOREST.trunk)],
-    [new THREE.ConeGeometry(0.3, 0.42, 7).translate(0, 0.36, 0), flat(FOREST.leavesDark)],
-    [new THREE.ConeGeometry(0.24, 0.36, 7).translate(0, 0.6, 0), flat(FOREST.leaves)],
-    [new THREE.ConeGeometry(0.16, 0.3, 7).translate(0, 0.84, 0), flat(FOREST.leaves)],
-  ];
   const items = scatter(track, occupied, {
     seed: 11,
     count: FOREST.treeCount,
     size: (r) => FOREST.treeHeight[0] + r() * (FOREST.treeHeight[1] - FOREST.treeHeight[0]),
     radius: (h) => h * 0.3,
   });
+  addPines(group, items, FOREST);
+}
+
+// Stacked-cone pines like the original game; the unit tree is 1 m tall and
+// each item's size is its height.
+function addPines(group, items, colors) {
+  const flat = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
+  const parts = [
+    [new THREE.CylinderGeometry(0.05, 0.065, 0.2, 6).translate(0, 0.1, 0), flat(colors.trunk)],
+    [new THREE.ConeGeometry(0.3, 0.42, 7).translate(0, 0.36, 0), flat(colors.leavesDark)],
+    [new THREE.ConeGeometry(0.24, 0.36, 7).translate(0, 0.6, 0), flat(colors.leaves)],
+    [new THREE.ConeGeometry(0.16, 0.3, 7).translate(0, 0.84, 0), flat(colors.leaves)],
+  ];
   const matrices = items.map((it) => compose(it.x, 0, it.z, it.rot, it.size, it.size, it.size));
   for (const [geo, mat] of parts) group.add(instanced(geo, mat, matrices));
+}
+
+// ---------- Eifel (Nürburgring) ----------
+
+function decorateEifel(group, track, place, occupied) {
+  const { x: fx, z: fz, nx, nz } = track.finish;
+  const bo = track.barrierOffset;
+  // Grandstands and flags along the start straight (Döttinger Höhe), far side
+  const far = nz > 0 ? -1 : 1;
+  for (let i = 0; i < 3; i++) {
+    const s = track.finish.s + 25 + i * PROP_SCALE * 1.4;
+    const p = track.at(s);
+    const x = p.x + p.nx * far * (bo + 6);
+    const z = p.z + p.nz * far * (bo + 6);
+    place('grandStandCovered', x, z, Math.atan2(-p.nz * far, p.nx * far) + Math.PI / 2, PROP_SCALE, PROP_SCALE * 0.8);
+  }
+  for (const k of [-1, 1]) place('flagCheckers', fx + nx * far * (bo + 2) + k * 4, fz + nz * far * (bo + 2), 0, 5, 2);
+
+  // Nürburg castle on its hill, in the open middle of the loop
+  const b = bounds(track);
+  const cx = (b.minX + b.maxX) / 2;
+  const cz = (b.minZ + b.maxZ) / 2;
+  addCastle(group, cx, cz);
+  occupied.push({ x: cx, z: cz, r: 45 });
+
+  // Rolling hills on the horizon
+  const hillMat = new THREE.MeshLambertMaterial({ color: EIFEL.hill, flatShading: true });
+  for (const [hx, hz, r, h] of [
+    [b.minX - 120, b.minZ - 60, 110, 45],
+    [cx, b.minZ - 160, 150, 60],
+    [b.maxX + 130, b.minZ + 40, 120, 50],
+  ]) {
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(r, h, 9), hillMat);
+    hill.position.set(hx, h / 2 - 2, hz);
+    group.add(hill);
+  }
+
+  // The Green Hell: dense pines lining the whole lap
+  const items = scatter(track, occupied, {
+    seed: 61,
+    count: EIFEL.treeCount,
+    margin: 70,
+    size: (r) => EIFEL.treeHeight[0] + r() * (EIFEL.treeHeight[1] - EIFEL.treeHeight[0]),
+    radius: (h) => h * 0.26,
+    clearance: (h) => h * 0.3 + 2,
+    reject: (x, z) => Math.abs(track.nearest(x, z).offset) > EIFEL.forestBand,
+  });
+  addPines(group, items, EIFEL);
+}
+
+function addCastle(group, x, z) {
+  const stone = new THREE.MeshLambertMaterial({ color: EIFEL.stone, flatShading: true });
+  const roof = new THREE.MeshLambertMaterial({ color: EIFEL.roof, flatShading: true });
+  const castle = new THREE.Group();
+  const hill = new THREE.Mesh(new THREE.CylinderGeometry(26, 40, 10, 10), new THREE.MeshLambertMaterial({ color: EIFEL.hill, flatShading: true }));
+  hill.position.y = 5;
+  castle.add(hill);
+  const keep = new THREE.Mesh(new THREE.CylinderGeometry(5, 5.5, 22, 10), stone);
+  keep.position.set(0, 21, 0);
+  const keepRoof = new THREE.Mesh(new THREE.ConeGeometry(6.2, 7, 10), roof);
+  keepRoof.position.set(0, 35.5, 0);
+  castle.add(keep, keepRoof);
+  // Curtain wall with corner towers
+  for (const [wx, wz, w, d] of [
+    [0, -13, 26, 2],
+    [0, 13, 26, 2],
+    [-13, 0, 2, 26],
+    [13, 0, 2, 26],
+  ]) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 7, d), stone);
+    wall.position.set(wx, 13.5, wz);
+    castle.add(wall);
+  }
+  for (const [tx, tz] of [[-13, -13], [13, -13], [-13, 13], [13, 13]]) {
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.8, 12, 8), stone);
+    tower.position.set(tx, 16, tz);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(3.2, 4, 8), roof);
+    cap.position.set(tx, 24, tz);
+    castle.add(tower, cap);
+  }
+  castle.position.set(x, 0, z);
+  castle.traverse((o) => o.isMesh && ((o.castShadow = true), (o.receiveShadow = true)));
+  group.add(castle);
 }
 
 // ---------- Volcano ----------

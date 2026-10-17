@@ -10,15 +10,26 @@ export const LINE_WIDTH = 0.35;  // strip next to the barrier
 export const BARRIER_RADIUS = 0.45;
 const START_TO_LINE = 8;         // the car starts this many metres before the finish line
 const SAMPLE_STEP = 0.75;        // metres between centerline samples
+const NEAR_WINDOW = 60;          // samples searched either side of the last nearest point
+const COARSE_STRIDE = 4;         // full searches scan every 4th sample, then refine
 
 export function createTrackPath(def) {
   const roadHalfWidth = def.roadHalfWidth;
   const barrierOffset = roadHalfWidth + KERB_WIDTH + LINE_WIDTH + 0.35; // barrier tube centre
-  const centerline = buildCenterline(def.corners, def.radius);
+  const radius = def.maxRadius ? autoRadii(def.corners, def.maxRadius, barrierOffset + 1) : def.radius;
+  const centerline = buildCenterline(def.corners, radius);
   const last = centerline[centerline.length - 1];
   const length = last.s + Math.hypot(centerline[0].x - last.x, centerline[0].z - last.z);
 
-  const nearest = (x, z) => nearestOn(centerline, x, z);
+  // The car asks every physics step from roughly the same place: search a
+  // window around the previous answer first, fall back to the whole loop.
+  let hint = 0;
+  const nearest = (x, z) => {
+    const local = nearestOn(centerline, x, z, hint, NEAR_WINDOW);
+    const n = Math.abs(local.offset) <= barrierOffset + 1 ? local : nearestOn(centerline, x, z);
+    hint = n.index;
+    return n;
+  };
   const at = (s) => pointAt(centerline, length, s);
 
   const finishP = at(nearest(def.finish[0], def.finish[1]).s);
@@ -65,7 +76,8 @@ function buildCenterline(corners, radius) {
   for (let i = 0; i < n; i++) {
     const f = fillets[i];
     const a0 = Math.atan2(f.start[1] - f.centre[1], f.start[0] - f.centre[0]);
-    const arcSteps = Math.max(2, Math.ceil((f.angle * f.R) / SAMPLE_STEP));
+    // (a straight-through corner has no arc; skipping it avoids duplicate points)
+    const arcSteps = f.angle < 0.01 ? 0 : Math.max(2, Math.ceil((f.angle * f.R) / SAMPLE_STEP));
     for (let k = 0; k < arcSteps; k++) {
       const a = a0 + f.side * f.angle * (k / arcSteps);
       pts.push([f.centre[0] + Math.cos(a) * f.R, f.centre[1] + Math.sin(a) * f.R]);
@@ -93,13 +105,47 @@ function buildCenterline(corners, radius) {
   return out;
 }
 
+// Corner radii that fit: each arc may use at most half of each neighbouring
+// straight, capped at maxR and never tighter than minR.
+function autoRadii(corners, maxR, minR) {
+  const n = corners.length;
+  return corners.map((c, i) => {
+    const p = corners[(i - 1 + n) % n];
+    const q = corners[(i + 1) % n];
+    const lenIn = Math.hypot(c[0] - p[0], c[1] - p[1]);
+    const lenOut = Math.hypot(q[0] - c[0], q[1] - c[1]);
+    const a = Math.atan2(c[1] - p[1], c[0] - p[0]);
+    const b = Math.atan2(q[1] - c[1], q[0] - c[0]);
+    const turn = Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)));
+    const fit = (0.5 * Math.min(lenIn, lenOut)) / Math.max(1e-6, Math.tan(turn / 2));
+    return Math.max(minR, Math.min(maxR, fit));
+  });
+}
+
 // Nearest point on the closed centerline: segment index, distance along the
 // track (s) and signed lateral offset (+ = right of driving direction).
-function nearestOn(pts, x, z) {
+// With `from`/`window` only that stretch is searched; otherwise a coarse scan
+// of the whole loop is refined around its best sample.
+function nearestOn(pts, x, z, from = null, window = 0) {
+  const n = pts.length;
+  if (from === null) {
+    let coarse = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < n; i += COARSE_STRIDE) {
+      const d = (pts[i].x - x) ** 2 + (pts[i].z - z) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        coarse = i;
+      }
+    }
+    from = coarse;
+    window = COARSE_STRIDE * 2;
+  }
   let best = Infinity;
   let bestI = 0;
   let bestT = 0;
-  for (let i = 0; i < pts.length; i++) {
+  for (let k = -window; k <= window; k++) {
+    const i = (((from + k) % n) + n) % n;
     const a = pts[i];
     const b = pts[(i + 1) % pts.length];
     const dx = b.x - a.x;

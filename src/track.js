@@ -14,9 +14,12 @@ export function buildWorld(track, theme) {
   const pts = track.centerline;
 
   // Ground
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), flat(theme.ground));
+  const c = centre(pts);
+  const extent = Math.max(...pts.map((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.z - c.z))));
+  const size = Math.max(700, extent * 2 + 500);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), flat(theme.ground));
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(centre(pts).x, 0, centre(pts).z);
+  ground.position.set(c.x, 0, c.z);
   ground.receiveShadow = true;
   group.add(ground);
 

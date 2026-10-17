@@ -5,7 +5,7 @@ Minijoc de curses per al navegador (PC i mòbil). El cotxe accelera sol; tu nom�
 - Teclat: `←`/`A` i `→`/`D`
 - Mòbil: mantén premuda la meitat esquerra o dreta de la pantalla
 - Mantén el gir als revolts per derrapar: en deixar-lo anar, turbo
-- Quatre circuits: Bosque (fàcil), Cielo (mitjà), Volcán (difícil) i Mónaco (expert, 1 volta), cadascun amb el seu rànquing
+- Cinc circuits: Bosque (fàcil), Cielo (mitjà), Volcán (difícil), Mónaco (expert, 1 volta) i Nürburgring (llegenda, 1 volta de ~1:30), cadascun amb el seu rànquing
 
 Executar en local: `npx http-server .` i obrir `http://localhost:8080`.
 

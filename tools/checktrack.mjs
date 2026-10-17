@@ -8,7 +8,7 @@ for (const def of TRACKS) {
   const t = createTrackPath(def);
   const c = def.corners;
   const n = c.length;
-  const R = (i) => (Array.isArray(def.radius) ? def.radius[i] : def.radius);
+  const R = (i) => (def.maxRadius ? null : Array.isArray(def.radius) ? def.radius[i] : def.radius);
   const cut = (i) => {
     const p = c[(i - 1 + n) % n], q = c[i], r = c[(i + 1) % n];
     const a = Math.atan2(q[1] - p[1], q[0] - p[0]);
@@ -17,12 +17,17 @@ for (const def of TRACKS) {
     if (R(i) < t.barrierOffset + 0.5) console.log(`  ${def.id}: corner ${i} radius ${R(i)} < inner barrier ${t.barrierOffset.toFixed(1)}`), (ok = false);
     return R(i) * Math.tan(ang / 2);
   };
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < n && !def.maxRadius; i++) {
     const j = (i + 1) % n;
     const len = Math.hypot(c[j][0] - c[i][0], c[j][1] - c[i][1]);
     const need = cut(i) + cut(j);
     if (need > len) console.log(`  ${def.id}: segment ${i}->${j} len ${len.toFixed(1)} < arcs ${need.toFixed(1)}`), (ok = false);
   }
+  // Arcs that don't fit show up as the centerline folding back on itself
+  t.centerline.forEach((p, i) => {
+    const q = t.centerline[(i + 1) % t.centerline.length];
+    if (p.tx * q.tx + p.tz * q.tz < 0.5) console.log(`  ${def.id}: centerline folds at (${p.x.toFixed(0)},${p.z.toFixed(0)})`), (ok = false);
+  });
   // Self clearance between parts of the loop that are far apart along s
   const minGap = 2 * (t.barrierOffset + BARRIER_RADIUS) + 0.5;
   let worst = Infinity, where = null;
