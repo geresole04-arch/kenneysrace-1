@@ -282,8 +282,8 @@ body {
 /* Main menu */
 
 .menu-title {
-  margin: 4px 0 16px;
-  font-size: 34px;
+  margin: 0 0 12px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 0.95;
   color: #18a9ad;
@@ -295,8 +295,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
-  padding: 14px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
   border-radius: 16px;
   text-align: left;
   color: #fff;
@@ -314,6 +314,10 @@ body {
   background: linear-gradient(135deg, #e32b2b, #c22020 45%, #2a8fd6);
 }
 
+.track-card.theme-eifel {
+  background: linear-gradient(135deg, #1b5a39, #226b45 50%, #f2c531);
+}
+
 .track-card.theme-volcano {
   background: linear-gradient(135deg, #3b3230, #2a1d1b 55%, #ff5a14);
 }
@@ -324,7 +328,7 @@ body {
 }
 
 .track-name {
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -335,7 +339,7 @@ body {
 }
 
 .track-best {
-  margin-top: 4px;
+  margin-top: 2px;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -343,12 +347,12 @@ body {
 .track-buttons {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .track-buttons .btn {
-  padding: 8px 14px;
-  font-size: 16px;
+  padding: 6px 12px;
+  font-size: 15px;
 }
 
 .menu-help {

@@ -5,6 +5,7 @@ const FOREST_SCALE = 0.8;
 const VOLCANO_SCALE = 0.82;
 const SKY_SCALE = 0.85;
 const MONACO_SCALE = 0.21; // metres per pixel of the reference drawing
+const NRING_SCALE = 2.8;   // metres per pixel of the Nordschleife map
 
 export const TRACKS = [
   {
@@ -65,7 +66,40 @@ export const TRACKS = [
     finish: [0, 430 * MONACO_SCALE], // on the long left straight
     collection: 'scores_monaco',
   },
+  {
+    id: 'nurburgring',
+    name: 'Nürburgring',
+    subtitle: 'Leyenda · 1 vuelta',
+    theme: 'eifel',
+    laps: 1,
+    // The Nordschleife loop traced from the user's map (the GP section is
+    // left out) with its signature corners sharpened so drifting pays off.
+    // ~2.9 km through the forest; corner radii are sized automatically.
+    corners: NRING_PX().map(([x, y]) => [x * NRING_SCALE, y * NRING_SCALE]),
+    maxRadius: 12,
+    roadHalfWidth: 5,
+    finish: [262 * NRING_SCALE, 230 * NRING_SCALE], // on the Döttinger Höhe straight
+    collection: 'scores_nurburgring',
+  },
 ];
+
+// Pixel coordinates on the reference map, in driving order (clockwise)
+function NRING_PX() {
+  return [
+    [232, 250], [205, 268], [190, 283], // Antoniusbuche, Tiergarten, Hohenrain
+    [165, 292], [140, 286], [126, 272], // Hatzenbach
+    [110, 248], [106, 225], [104, 200], [99, 178], // Quiddelbach, Flugplatz, Kottenborn, Schwedenkreuz
+    [68, 172], [90, 140], // Aremberg (sharp right), Fuchsröhre
+    [114, 128], [108, 112], [122, 100], // Adenauer Forst chicane
+    [124, 82], [130, 62], // Metzgesfeld, Kallenhard
+    [138, 40], [160, 60], [184, 38], [200, 50], // Wehrseifen, Breidscheid, Ex-Mühle
+    [212, 38], [232, 24], [252, 28], [270, 42], [292, 54], // Bergwerk, Kesselchen
+    [318, 58], [338, 82], [350, 60], // Klostertal, Karussell
+    [364, 44], [386, 46], [408, 62], [392, 76], [414, 94], // Hohe Acht, Wippermann, Eschbach, Brünnchen
+    [396, 108], [378, 124], [366, 142], [344, 150], [318, 156], // Pflanzgarten ... kleines Karussell
+    [336, 176], [318, 192], // Galgenkopf, then Döttinger Höhe
+  ];
+}
 
 function MONACO_PX() {
   return [
